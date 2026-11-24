@@ -1,0 +1,258 @@
+{
+  "schema_version": "1",
+  "id": "fasting",
+  "question": "Does intermittent fasting improve long-term weight loss?",
+  "config": {
+    "num_agents": 2,
+    "rounds": 3,
+    "models": {
+      "moderator": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "advocate": "llama-3.3-70b-versatile",
+      "critic": "qwen/qwen3-32b",
+      "judge": "openai/gpt-oss-120b"
+    },
+    "aggregation": "evidence_weighted"
+  },
+  "agents": [
+    {
+      "id": "advocate-pro",
+      "name": "Scholar Maya",
+      "role": "scholar",
+      "personality": { "trait": "Conscientiousness", "level": "high" },
+      "stance": "pro",
+      "model": "llama-3.3-70b-versatile"
+    },
+    {
+      "id": "advocate-con",
+      "name": "Advocate Liam",
+      "role": "advocate",
+      "personality": { "trait": "Extraversion", "level": "high" },
+      "stance": "con",
+      "model": "llama-3.3-70b-versatile"
+    },
+    {
+      "id": "critic-1",
+      "name": "Dr. Aris Thorne",
+      "role": "critic",
+      "personality": { "trait": "Neuroticism", "level": "high" },
+      "stance": "neutral",
+      "model": "qwen/qwen3-32b"
+    },
+    {
+      "id": "judge-1",
+      "name": "Judge Panel Chair",
+      "role": "judge",
+      "personality": { "trait": "Agreeableness", "level": "high" },
+      "stance": "neutral",
+      "model": "openai/gpt-oss-120b"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "source": "New England Journal of Medicine (2022) — Liu et al. 12-Month RCT",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/35443107/",
+      "quote": "The mean weight loss from baseline at 12 months was -8.0 kg in the time-restriction group and -6.3 kg in the daily-calorie-restriction group. Changes in weight were not significantly different in the two groups at the 12-month assessment (net difference, -1.8 kg; 95% CI, -4.0 to 0.4; P = 0.11).",
+      "credibility": 0.96
+    },
+    {
+      "id": "E2",
+      "source": "JAMA Internal Medicine (2020) — TREAT Randomized Clinical Trial",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/32986097/",
+      "quote": "Time-restricted eating, in the absence of other interventions, is not more effective in weight loss than eating throughout the day (-0.94 kg vs -0.68 kg; between-group P = 0.63).",
+      "credibility": 0.94
+    },
+    {
+      "id": "E3",
+      "source": "JAMA Internal Medicine (2020) — TREAT Lean Mass Finding",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/32986097/",
+      "quote": "There was also a significant difference in appendicular lean mass index between groups (-0.16 kg/m2; 95% CI, -0.27 to -0.05; P = .005) in the in-person cohort.",
+      "credibility": 0.94
+    },
+    {
+      "id": "E4",
+      "source": "Cochrane Database of Systematic Reviews (2026) — IF Review",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/41692034/",
+      "quote": "Compared to regular dietary advice, intermittent fasting may result in little to no difference in weight loss or quality of life. The included studies focused on short-term effects up to 12 months, limiting evidence for longer durations.",
+      "credibility": 0.95
+    },
+    {
+      "id": "E5",
+      "source": "Wikipedia — Intermittent fasting",
+      "url": "https://en.wikipedia.org/wiki/Intermittent_fasting",
+      "quote": "Methods of intermittent fasting include alternate-day fasting, periodic fasting, such as the 5:2 diet, and daily time-restricted eating.",
+      "credibility": 0.72
+    },
+    {
+      "id": "E6",
+      "source": "NIH / NIDDK — Weight Management Guidelines",
+      "url": "https://www.niddk.nih.gov/health-information/weight-management",
+      "quote": "Successful long-term weight management centers on sustainable reductions in overall energy intake, healthy dietary quality, and regular physical activity tailored to individual adherence.",
+      "credibility": 0.9
+    }
+  ],
+  "rounds": [
+    {
+      "number": 1,
+      "kind": "opening",
+      "arguments": [
+        {
+          "id": "arg-if-1-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "Intermittent fasting is an effective, practical framework for achieving sustained 12-month weight loss when structured thoughtfully. First, in the 12-month NEJM randomized trial [E1], participants practicing 8:00 AM–4:00 PM time-restricted eating achieved an average 8.0 kg weight reduction with 84.9% 12-month completion. Second, because intermittent fasting covers multiple accessible protocols—such as 16:8 time-restricted eating, 5:2 periodic fasting, and alternate-day fasting [E5]—patients can choose a rule-based schedule rather than counting every calorie. Third, structured eating windows naturally align with clinical guidance emphasizing adherence and sustained calorie reduction [E6].",
+          "claims": [
+            "Participants in a 12-month NEJM RCT using time-restricted eating lost 8.0 kg with 84.9% retention [E1].",
+            "Flexible IF protocols (16:8, 5:2, alternate-day fasting) simplify dietary rules compared to continuous calorie tracking [E5].",
+            "Simpler adherence rules support sustainable long-term calorie deficits recommended by NIDDK guidelines [E6]."
+          ],
+          "rebuts": [],
+          "evidence_ids": ["E1", "E5", "E6"],
+          "confidence": 0.72,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 2.4,
+            "issues": [
+              {
+                "type": "cherry_picking",
+                "note": "E1 found NO statistically significant difference versus daily calorie restriction alone (-8.0 kg vs -6.3 kg, P = 0.11); citing only the -8.0 kg arm misstates the trial's conclusion."
+              }
+            ]
+          },
+          "strength": 0.48
+        },
+        {
+          "id": "arg-if-1-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "Clinical trial evidence shows intermittent fasting does NOT improve long-term weight loss beyond standard calorie restriction or regular dietary advice. In the landmark 12-month NEJM trial [E1], the difference between time-restricted eating and daily calorie restriction (-1.8 kg) was not statistically significant (P = 0.11), with no added benefit in body fat or metabolic markers. Similarly, the TREAT randomized trial in JAMA Internal Medicine [E2] found no weight-loss superiority over eating throughout the day (P = 0.63) and even noted a drop in appendicular lean mass [E3]. A 2026 Cochrane systematic review [E4] confirms intermittent fasting yields little to no difference over regular dietary advice and lacks evidence beyond 12 months.",
+          "claims": [
+            "The 12-month NEJM RCT showed time-restricted eating was not significantly better than standard calorie restriction (P = 0.11) [E1].",
+            "The TREAT RCT found no significant weight-loss difference (P = 0.63) and raised concerns about lean mass loss [E2, E3].",
+            "A 2026 Cochrane review concluded IF produces little to no difference versus regular dietary advice and lacks multi-year trial evidence [E4]."
+          ],
+          "rebuts": [],
+          "evidence_ids": ["E1", "E2", "E3", "E4"],
+          "confidence": 0.91,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.6,
+            "issues": []
+          },
+          "strength": 0.93
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "kind": "rebuttal",
+      "arguments": [
+        {
+          "id": "arg-if-2-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "I accept the Critic's correction and Con's point on isocaloric equality: when calories are explicitly matched as in [E1], time-restricted eating confers no special metabolic magic over daily restriction. However, outside tightly controlled trials, people do not weigh every gram of food indefinitely. Compared to no intervention or unstructured eating, Cochrane notes a modest percentage weight loss signal, and for individuals who find meal-timing boundaries easier than calorie logging [E5], intermittent fasting remains a valid behavioral tool to sustain lower energy intake [E6].",
+          "claims": [
+            "IF performs equivalently to calorie restriction when intake is matched [E1], not worse.",
+            "In real-world settings, time windows can serve as a simpler behavioral cue to maintain calorie balance [E5, E6]."
+          ],
+          "rebuts": ["arg-if-1-con"],
+          "evidence_ids": ["E1", "E5", "E6"],
+          "confidence": 0.68,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 3.9,
+            "issues": []
+          },
+          "strength": 0.74
+        },
+        {
+          "id": "arg-if-2-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "Even as a purely behavioral tool without calorie counting, the TREAT trial [E2] directly tested ad libitum 16:8 time-restricted eating without calorie instructions—and participants lost less than 1 kg over 12 weeks, statistically indistinguishable from three regular meals (P = 0.63), while losing more lean mass [E3]. And the Cochrane review [E4] explicitly highlights that almost no high-certainty evidence extends beyond 12 months, meaning long-term superiority remains unproven.",
+          "claims": [
+            "Ad libitum 16:8 fasting without calorie targets failed to outperform regular meal timing in the TREAT RCT [E2].",
+            "Lean mass preservation is a real risk when fasting is uncoupled from resistance training and protein targets [E3].",
+            "Long-term (>12 month) clinical trial evidence for intermittent fasting remains scarce [E4]."
+          ],
+          "rebuts": ["arg-if-2-pro"],
+          "evidence_ids": ["E2", "E3", "E4"],
+          "confidence": 0.9,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.5,
+            "issues": []
+          },
+          "strength": 0.91
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "kind": "rebuttal",
+      "arguments": [
+        {
+          "id": "arg-if-3-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "The strongest honest framing is nuance: intermittent fasting does not improve long-term weight loss *beyond* equivalent calorie restriction [E1, E4], but it can improve long-term weight loss *for individuals who struggle with daily calorie counting*—provided protein intake and physical activity are maintained to protect lean mass [E3, E6].",
+          "claims": [
+            "IF matches standard calorie restriction in efficacy [E1, E4] and helps specific individuals adhere to lower intake [E6]."
+          ],
+          "rebuts": ["arg-if-2-con"],
+          "evidence_ids": ["E1", "E3", "E4", "E6"],
+          "confidence": 0.62,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.1,
+            "issues": []
+          },
+          "strength": 0.78
+        },
+        {
+          "id": "arg-if-3-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "That concession settles the core question: 'Does intermittent fasting improve long-term weight loss?' Across the NEJM 12-month trial [E1], JAMA's TREAT trial [E2], and the 2026 Cochrane review [E4], the answer is no—it is at best equivalent to standard dietary advice and calorie restriction, with unresolved questions beyond 12 months and potential lean-mass tradeoffs [E3].",
+          "claims": [
+            "High-certainty RCTs and systematic reviews show IF does not improve long-term weight loss compared to standard calorie restriction [E1, E2, E4]."
+          ],
+          "rebuts": ["arg-if-3-pro"],
+          "evidence_ids": ["E1", "E2", "E3", "E4"],
+          "confidence": 0.92,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.7,
+            "issues": []
+          },
+          "strength": 0.94
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "decision": "Con: Intermittent fasting does not outperform standard calorie restriction for long-term weight loss",
+    "confidence": 0.88,
+    "reasoning": "High-quality randomized controlled trials (NEJM 2022 [E1], JAMA Internal Medicine TREAT 2020 [E2]) and the 2026 Cochrane systematic review [E4] consistently show no statistically significant long-term weight-loss advantage for intermittent fasting over regular dietary advice or equivalent daily calorie restriction. Pro's initial claim was penalized by the Critic for omitting the null between-group comparison in [E1]. While IF remains a viable behavioral alternative for individuals who prefer time boundaries over calorie tracking [E6], it is not superior and requires attention to lean mass retention [E3].",
+    "winning_points": [
+      "12-month NEJM RCT found no significant difference between time-restricted eating + calorie restriction vs calorie restriction alone (-1.8 kg, P = 0.11) [E1].",
+      "TREAT RCT showed no benefit for ad libitum 16:8 eating vs structured meals (P = 0.63) and flagged lean-mass reduction [E2, E3].",
+      "2026 Cochrane review concluded IF yields little to no difference over regular dietary advice, with trials rarely extending past 12 months [E4]."
+    ],
+    "open_disagreements": [
+      "Whether multi-year (>24 month) adherence differs meaningfully between meal-timing rules and continuous calorie counting.",
+      "How early-window vs late-window eating affects insulin sensitivity independently of total weight loss."
+    ],
+    "votes": [
+      { "agent_id": "advocate-con", "choice": "Con", "weight": 2.78 },
+      {
+        "agent_id": "advocate-pro",
+        "choice": "Pro (Conditional)",
+        "weight": 2.0
+      },
+      { "agent_id": "judge-1", "choice": "Con", "weight": 1.0 }
+    ]
+  },
+  "created_at": "2026-11-24T12:15:00Z"
+}

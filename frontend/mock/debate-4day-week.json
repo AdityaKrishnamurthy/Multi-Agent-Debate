@@ -1,0 +1,266 @@
+{
+  "schema_version": "1",
+  "id": "4day-week",
+  "question": "Should our college switch to a 4-day week?",
+  "config": {
+    "num_agents": 2,
+    "rounds": 3,
+    "models": {
+      "moderator": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "advocate": "llama-3.3-70b-versatile",
+      "critic": "qwen/qwen3-32b",
+      "judge": "openai/gpt-oss-120b"
+    },
+    "aggregation": "evidence_weighted"
+  },
+  "agents": [
+    {
+      "id": "advocate-pro",
+      "name": "Elena Vance",
+      "role": "advocate",
+      "personality": { "trait": "Extraversion", "level": "high" },
+      "stance": "pro",
+      "model": "llama-3.3-70b-versatile"
+    },
+    {
+      "id": "advocate-con",
+      "name": "Marcus Chen",
+      "role": "advocate",
+      "personality": { "trait": "Conscientiousness", "level": "high" },
+      "stance": "con",
+      "model": "llama-3.3-70b-versatile"
+    },
+    {
+      "id": "critic-1",
+      "name": "Dr. Aris Thorne",
+      "role": "critic",
+      "personality": { "trait": "Neuroticism", "level": "high" },
+      "stance": "neutral",
+      "model": "qwen/qwen3-32b"
+    },
+    {
+      "id": "judge-1",
+      "name": "Judge Panel Chair",
+      "role": "judge",
+      "personality": { "trait": "Agreeableness", "level": "high" },
+      "stance": "neutral",
+      "model": "openai/gpt-oss-120b"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "source": "4 Day Week Global — UK Pilot Results",
+      "url": "https://www.4dayweek.com/research",
+      "quote": "39% staff felt less stressed, 55% reported an increase in work ability, 65% reduced absenteeism due to sick leave, and 92% of companies opted to continue with the 4 Day week.",
+      "credibility": 0.82
+    },
+    {
+      "id": "E2",
+      "source": "JMIR Medical Education (2025) — Sharjah University 4-Day Academic Week",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/41187279/",
+      "quote": "Overall, most students reported increased motivation, engagement, and academic achievement following the transition from a 5-day to a 4-day week, alongside improved physical and mental well-being.",
+      "credibility": 0.89
+    },
+    {
+      "id": "E3",
+      "source": "JMIR Medical Education (2025) — Challenges in Condensed Schedules",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/41187279/",
+      "quote": "Some students expressed concerns about condensed schedules and longer days, increased stress, disrupted work-life balance, and inadequate support systems to cope with this new framework.",
+      "credibility": 0.89
+    },
+    {
+      "id": "E4",
+      "source": "Wikipedia — Four-day workweek",
+      "url": "https://en.wikipedia.org/wiki/Four-day_workweek",
+      "quote": "A four-day workweek is an arrangement where a workplace or place of education has its employees or students work or attend school, college or university over the course of four days per week rather than the more customary five-day workweek.",
+      "credibility": 0.72
+    },
+    {
+      "id": "E5",
+      "source": "Journal of School Health (2021) — Oregon 4-Day Schedule Study",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/34617281/",
+      "quote": "Adolescents in 4-day school week environments reported fewer days of physical education, higher food insecurity risk, and altered health behaviors compared to 5-day schedules.",
+      "credibility": 0.85
+    },
+    {
+      "id": "E6",
+      "source": "Early Childhood Research Quarterly — 4-Day Schedule Achievement",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/36875318/",
+      "quote": "Longitudinal Oregon data examines achievement gaps between four-day and five-day academic schedules when instructional hours are redistributed across fewer days.",
+      "credibility": 0.86
+    }
+  ],
+  "rounds": [
+    {
+      "number": 1,
+      "kind": "opening",
+      "arguments": [
+        {
+          "id": "arg-4dw-1-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "Switching our college to a 4-day week is both feasible and deeply beneficial for students and staff. First, empirical higher-education evidence from Sharjah's transition to a 4-day academic week shows most students reported higher motivation, engagement, and academic achievement [E2]. Second, large-scale workplace trials show a 39% drop in staff stress and a 65% reduction in sick-leave absenteeism [E1], which directly addresses faculty burnout and advisor turnover. Third, consolidating campus operations into four days gives commuter students an uninterrupted study or internship day while reducing building energy overhead [E4].",
+          "claims": [
+            "University students in a 4-day academic week reported higher motivation, engagement, and perceived academic achievement [E2].",
+            "Faculty and administrative staff experience large reductions in stress (39%) and absenteeism (65%) under 4-day schedules [E1].",
+            "A 4-day college schedule creates a dedicated day for research, internships, and deep study while trimming campus overhead [E4]."
+          ],
+          "rebuts": [],
+          "evidence_ids": ["E1", "E2", "E4"],
+          "confidence": 0.84,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 3.8,
+            "issues": [
+              {
+                "type": "generalization",
+                "note": "E1 measures corporate workplaces rather than academic calendars, and E2 is a qualitative study of 24 health-sciences students."
+              }
+            ]
+          },
+          "strength": 0.81
+        },
+        {
+          "id": "arg-4dw-1-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "Switching an entire college to a 4-day week risks academic overload and unequal student harm. Even in the Sharjah university study [E3], students warned about condensed schedules, longer instructional days, and elevated stress when the same syllabus is compressed into four days. Furthermore, empirical evaluations of compressed school weeks highlight achievement tradeoffs when instructional pacing is disrupted [E6], and reduced campus exposure can worsen support gaps for students who rely on campus dining, labs, and advising [E5].",
+          "claims": [
+            "Compressing five days of coursework into four lengthens daily schedules and increases cognitive fatigue for some students [E3].",
+            "Empirical data on 4-day schedules indicates potential achievement risks when instructional hours are redistributed [E6].",
+            "Closing campus a fifth day disproportionately harms students dependent on daily campus meals, labs, and in-person support [E5]."
+          ],
+          "rebuts": [],
+          "evidence_ids": ["E3", "E5", "E6"],
+          "confidence": 0.79,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 3.4,
+            "issues": [
+              {
+                "type": "scope_mismatch",
+                "note": "E5 and E6 study K-12 students in rural Oregon rather than college undergraduates, who have greater scheduling autonomy."
+              }
+            ]
+          },
+          "strength": 0.75
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "kind": "rebuttal",
+      "arguments": [
+        {
+          "id": "arg-4dw-2-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "My opponent relies heavily on K-12 studies [E5], [E6] to warn against a college schedule change, which misses a crucial distinction: college students already manage asynchronous coursework, labs, and part-time jobs rather than sitting in 8-to-3 homerooms. More importantly, keeping the library, dining halls, and counseling centers open on Friday while holding formal lectures Monday through Thursday completely solves the support-access concern [E3]. That gives us the motivation and mental-health gains observed in higher education [E2] plus staff retention benefits [E1] without starving campus services.",
+          "claims": [
+            "K-12 outcomes in E5 and E6 do not directly transfer to adult college students with modular schedules.",
+            "Keeping campus facilities (libraries, dining, labs) open on Friday mitigates the support concerns raised in E3 and E5.",
+            "A 4-day instructional week with open Friday study facilities preserves both academic support and well-being gains [E1, E2]."
+          ],
+          "rebuts": ["arg-4dw-1-con"],
+          "evidence_ids": ["E1", "E2", "E3", "E5", "E6"],
+          "confidence": 0.87,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.2,
+            "issues": []
+          },
+          "strength": 0.88
+        },
+        {
+          "id": "arg-4dw-2-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "Keeping campus buildings, dining, and labs staffed on Fridays directly cancels the cost and energy savings promised by a 4-day week [E4]! If faculty and student-services staff still work Fridays to prevent support gaps [E3], then either staff do not receive a true 4-day week [E1] or the college faces higher staggered-shift payroll costs. Meanwhile, STEM lab courses and studio majors cannot easily compress 15-hour weekly lab blocks into four days without creating severe classroom scheduling bottlenecks.",
+          "claims": [
+            "Keeping facilities open five days negates energy and overhead savings and undermines a true staff 4-day week [E1, E4].",
+            "STEM lab courses and clinical rotations face severe room and fatigue bottlenecks if compressed into four days [E3]."
+          ],
+          "rebuts": ["arg-4dw-2-pro"],
+          "evidence_ids": ["E1", "E3", "E4"],
+          "confidence": 0.82,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 2.3,
+            "issues": [
+              {
+                "type": "unsupported",
+                "note": "The claim about STEM lab scheduling bottlenecks and staggered-shift payroll costs is asserted without empirical citation."
+              }
+            ]
+          },
+          "strength": 0.56
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "kind": "rebuttal",
+      "arguments": [
+        {
+          "id": "arg-4dw-3-pro",
+          "agent_id": "advocate-pro",
+          "stance": "pro",
+          "text": "Staggered four-day shifts for essential student services solve the staffing paradox: every staff member still works a 4-day week (Monday–Thursday or Tuesday–Friday), preserving the 39% stress reduction and 65% absenteeism drop [E1] while keeping libraries and advising covered five days. For heavy lab departments, a college-wide 4-day core lecture schedule can allow optional Friday research and studio blocks—matching the flexibility students praised in [E2] while avoiding the compression fatigue flagged in [E3].",
+          "claims": [
+            "Staggered Monday–Thursday / Tuesday–Friday staff rotations deliver a 4-day workweek alongside 5-day student support [E1].",
+            "Making Friday an optional lab/research/workshop day prevents course compression fatigue while retaining core benefits [E2, E3]."
+          ],
+          "rebuts": ["arg-4dw-2-con"],
+          "evidence_ids": ["E1", "E2", "E3"],
+          "confidence": 0.86,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.3,
+            "issues": []
+          },
+          "strength": 0.9
+        },
+        {
+          "id": "arg-4dw-3-con",
+          "agent_id": "advocate-con",
+          "stance": "con",
+          "text": "Even as an optional Friday research and lab model, the transition demands major curriculum redesign and risks leaving behind students who struggle with condensed 4-day instruction [E3]. Before committing campus-wide, we lack multi-semester college GPA and graduation data comparable to the multi-year K-12 evidence base [E6]. A small departmental pilot is warranted, but an immediate college-wide switch is premature.",
+          "claims": [
+            "Multi-semester quantitative college achievement data on 4-day schedules remains limited compared to K-12 studies [E3, E6].",
+            "A targeted departmental pilot should precede any campus-wide switch."
+          ],
+          "rebuts": ["arg-4dw-3-pro"],
+          "evidence_ids": ["E3", "E6"],
+          "confidence": 0.76,
+          "critique": {
+            "by_agent": "critic-1",
+            "score": 4.0,
+            "issues": []
+          },
+          "strength": 0.8
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "decision": "Pro (Conditional Pilot): Adopt a 4-day core lecture week with Friday reserved for labs and support",
+    "confidence": 0.78,
+    "reasoning": "Evidence from higher education (Sharjah [E2], [E3]) and UK workplace trials [E1] demonstrates substantial gains in motivation, stress reduction, and absenteeism when schedules move to four days. However, Con successfully showed that hard campus closures risk support gaps [E5] and compressed-schedule fatigue [E3], and K-12 achievement warnings [E6] justify caution. Pro's final proposal—a 4-day core instructional week paired with staggered staff shifts and open Friday labs/support—captures the well-being benefits while mitigating the main operational risks.",
+    "winning_points": [
+      "Higher-education evidence shows improved student motivation and work-life balance when moving to a 4-day academic week [E2].",
+      "Workplace pilot data shows 39% lower staff stress and 65% lower sick-leave absenteeism [E1].",
+      "Staggered 4-day staff shifts keep libraries, dining, and Friday labs open without forcing 5-day workweeks."
+    ],
+    "open_disagreements": [
+      "Long-term quantitative effect on college STEM course pass rates and graduation rates remains unmeasured [E6].",
+      "Whether staggered Friday facility staffing reduces or eliminates projected building energy savings [E4]."
+    ],
+    "votes": [
+      { "agent_id": "advocate-pro", "choice": "Pro", "weight": 2.59 },
+      { "agent_id": "advocate-con", "choice": "Con", "weight": 2.11 },
+      { "agent_id": "judge-1", "choice": "Pro (Pilot)", "weight": 1.0 }
+    ]
+  },
+  "created_at": "2026-11-24T12:00:00Z"
+}
