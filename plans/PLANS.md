@@ -8,7 +8,7 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 |---|---|---|---|---|
 | 001 | [Project overview & scope](001-project-overview.md) | Phase 1 | — | Reference |
 | 002 | [Architecture, tech stack & shared schema](002-architecture-and-tech-stack.md) | Phase 1 | — | Reference |
-| 003 | [Repo setup & conventions](003-repo-setup-and-conventions.md) | Phase 1 (Part A) | — | Not started |
+| 003 | [Repo setup & conventions](003-repo-setup-and-conventions.md) | Phase 1 (Part A) | — | In progress |
 | 004 | [Frontend shell + mock debate](004-frontend-shell-and-mock-debate.md) | **Phase 1** | 003-A | Not started |
 | 005 | [Debate engine MVP (CLI)](005-debate-engine-mvp.md) | **Phase 1** | 003-A, 004 (schema types) | Not started |
 | 006 | [Personality-shaped agents](006-personality-shaped-agents.md) | Phase 1 / 2 | 005 | Not started |

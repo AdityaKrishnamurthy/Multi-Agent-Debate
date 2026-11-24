@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Environment
+.env
+
+# ML artifacts
+*.ckpt
+*.pt
+*.bin
+ml/data/raw/
+
+# Backend runs (git-ignored)
+backend/runs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Resources (papers, local only)
+resources/
