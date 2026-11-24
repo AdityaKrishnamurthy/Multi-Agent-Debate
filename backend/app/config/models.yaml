@@ -1,0 +1,41 @@
+# Model configuration — 002 §Model backends
+# Model IDs live only in this config file and are never hard-coded.
+# Groq models confirmed live via https://api.groq.com/openai/v1/models.
+
+profiles:
+  groq:
+    provider: groq
+    models:
+      judge: "openai/gpt-oss-120b"
+      debater: "openai/gpt-oss-20b"
+      moderator: "openai/gpt-oss-20b"
+      critic: "qwen/qwen3.8-27b"
+      scholar: "qwen/qwen3.8-27b"
+      explorer: "openai/gpt-oss-20b"
+  kaggle:
+    provider: hosted_vllm
+    base_url: "http://localhost:8000/v1"
+    models:
+      judge: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      debater: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      moderator: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      critic: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      scholar: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+      explorer: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+  local:
+    provider: ollama
+    base_url: "http://localhost:11434"
+    models:
+      judge: "qwen2.5:3b"
+      debater: "qwen2.5:3b"
+      moderator: "qwen2.5:3b"
+      critic: "qwen2.5:3b"
+      scholar: "qwen2.5:3b"
+      explorer: "qwen2.5:3b"
+
+defaults:
+  profile: groq
+  temperature: 0.7
+  max_tokens: 2048
+  max_retries: 1
+  backoff_base: 2.0

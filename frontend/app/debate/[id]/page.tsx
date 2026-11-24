@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { DebateWorkspace } from "@/components/debate/DebateWorkspace";
 
 export function generateStaticParams() {
-  return [{ id: "4day-week" }, { id: "fasting" }];
+  return [{ id: "4day-week" }, { id: "fasting" }, { id: "nuclear" }];
 }
 
 export default async function DebatePage({
