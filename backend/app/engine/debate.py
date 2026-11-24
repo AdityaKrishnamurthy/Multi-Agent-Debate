@@ -1,11 +1,13 @@
 """
-Debate engine MVP — plain async debate loop (005 §Step 6).
+Debate engine — personality-shaped agents + MAPS Critic revision loop (005 + 006).
 
-Protocol (with 2 advocates and 2 rebuttal rounds = 1 + 2 + 4 + 1 = 8 LLM calls):
-1. Moderator restates the question and assigns Pro / Con stances.
-2. Opening round: each advocate gives a position and 3 key points.
-3. Rebuttal rounds: each advocate sees the transcript and attacks the opponent's weakest point.
-4. Judge: reads the transcript and outputs a Verdict.
+Protocol:
+1. Moderator (Agreeableness) restates the question and assigns stances.
+2. Opening round: debaters (Advocate, Scholar, Explorer) present opening positions.
+3. Critic (Neuroticism) scores each argument (0-5). Any argument scoring below
+   `critic_threshold` (default 2.5) triggers at most 1 revision by its author.
+4. Rebuttal rounds: debaters attack the opponent's weakest points, followed by Critic.
+5. Judge: reads the full transcript including Critic feedback and renders a Verdict.
 """
 
 from __future__ import annotations
@@ -14,14 +16,17 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
-from app.llm import complete, get_raw_model_id, usage_tracker
+from app.agents.factory import AgentFactory
+from app.llm import complete, usage_tracker
 from app.schemas import (
     AdvocateOutput,
     AgentConfig,
     Argument,
+    CriticOutput,
+    Critique,
+    CritiqueIssue,
     Debate,
     DebateConfig,
     JudgeOutput,
@@ -33,14 +38,11 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 
-_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "agents" / "prompts"
+CRITIC_THRESHOLD = 2.5
+DEBATER_ROLES = {"advocate", "scholar", "explorer"}
 
 EventCallback = Callable[[str, dict[str, Any]], Any] | None
 CompleteFn = Callable[..., Awaitable[Any]]
-
-
-def _load_prompt(name: str) -> str:
-    return (_PROMPTS_DIR / f"{name}.md").read_text(encoding="utf-8")
 
 
 def _emit(callback: EventCallback, event: str, data: dict[str, Any]) -> None:
@@ -58,55 +60,113 @@ def _format_transcript(debate: Debate, mod_output: ModeratorOutput | None = None
     for rnd in debate.rounds:
         parts.append(f"\n=== Round {rnd.number} ({rnd.kind}) ===")
         for arg in rnd.arguments:
-            parts.append(f"[{arg.id} | {arg.agent_id} | {arg.stance.upper()}]: {arg.text}")
+            parts.append(f"[{arg.id} | {arg.agent_id} ({arg.stance.upper()})]: {arg.text}")
             if arg.claims:
                 parts.append("  Claims: " + " | ".join(arg.claims))
+            if arg.critique is not None:
+                parts.append(f"  Critic Score: {arg.critique.score:.1f}/5")
+                if arg.critique.issues:
+                    issues_str = "; ".join(f"{i.type}: {i.note}" for i in arg.critique.issues)
+                    parts.append(f"  Critic Issues: {issues_str}")
     return "\n".join(parts)
 
 
-def _create_default_agents(num_advocates: int, profile: str | None) -> list[AgentConfig]:
-    agents: list[AgentConfig] = [
-        AgentConfig(
-            id="moderator-1",
-            name="Moderator",
-            role="moderator",
-            personality=None,
-            stance="neutral",
-            model=get_raw_model_id("moderator", profile),
-        )
-    ]
+async def _run_critic_and_revise(
+    question: str,
+    rnd: Round,
+    critic: AgentConfig,
+    debaters_by_id: dict[str, AgentConfig],
+    factory: AgentFactory,
+    profile: str | None,
+    critic_threshold: float,
+    on_event: EventCallback,
+    complete_fn: CompleteFn,
+) -> None:
+    """Score each argument in `rnd`; if score < threshold, revise once."""
+    critic_sys = factory.get_system_prompt(critic)
+    critic_temp = factory.get_temperature("critic")
 
-    names = [
-        "Advocate Alpha",
-        "Advocate Beta",
-        "Advocate Gamma",
-        "Advocate Delta",
-        "Advocate Epsilon",
-    ]
-    for i in range(num_advocates):
-        stance = "pro" if i % 2 == 0 else "con"
-        agents.append(
-            AgentConfig(
-                id=f"advocate-{i + 1}",
-                name=names[i] if i < len(names) else f"Advocate {i + 1}",
-                role="advocate",
-                personality=None,
-                stance=stance,
-                model=get_raw_model_id("debater", profile),
+    # Iterate over snapshot so newly added revisions are never revised a second time
+    original_args = list(rnd.arguments)
+    for arg in original_args:
+        _emit(on_event, "agent_thinking", {"agent_id": critic.id})
+        critic_out: CriticOutput = await complete_fn(
+            role="critic",
+            system=critic_sys,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Question: {question}\n\n"
+                        f"Evaluate Argument {arg.id} by {arg.agent_id} ({arg.stance.upper()}):\n"
+                        f"{arg.text}\n\n"
+                        f"Claims: {arg.claims}\n\n"
+                        "Score from 0 to 5 on evidence support, logical validity, and relevance."
+                    ),
+                }
+            ],
+            schema=CriticOutput,
+            profile=profile,
+            temperature=critic_temp,
+        )
+
+        critique = Critique(
+            by_agent=critic.id,
+            score=critic_out.score,
+            issues=[CritiqueIssue(type=i.type, note=i.note) for i in critic_out.issues],
+        )
+        arg.critique = critique
+        _emit(on_event, "critique", {"argument_id": arg.id, **critique.model_dump()})
+
+        if critique.score < critic_threshold:
+            author = debaters_by_id.get(arg.agent_id)
+            if author is None:
+                continue
+            logger.info(
+                "Argument %s scored %.1f < %.1f; requesting 1 revision from %s",
+                arg.id,
+                critique.score,
+                critic_threshold,
+                author.id,
             )
-        )
-
-    agents.append(
-        AgentConfig(
-            id="judge-1",
-            name="Judge",
-            role="judge",
-            personality=None,
-            stance="neutral",
-            model=get_raw_model_id("judge", profile),
-        )
-    )
-    return agents
+            _emit(on_event, "agent_thinking", {"agent_id": author.id})
+            author_sys = factory.get_system_prompt(author)
+            author_temp = factory.get_temperature(author.role)
+            issues_desc = [f"[{i.type}] {i.note}" for i in critique.issues]
+            rev_out: AdvocateOutput = await complete_fn(
+                role="debater" if author.role == "advocate" else author.role,
+                system=author_sys,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question: {question}\n\n"
+                            f"Your argument {arg.id} scored {critique.score:.1f}/5 "
+                            f"from the Critic.\n"
+                            f"Issues flagged: {issues_desc}\n"
+                            f"Critic Socratic questions: {critic_out.questions}\n\n"
+                            f"Original text:\n{arg.text}\n\n"
+                            f"Revise your argument once to directly fix these weaknesses while "
+                            f"maintaining your {author.stance.upper()} stance."
+                        ),
+                    }
+                ],
+                schema=AdvocateOutput,
+                profile=profile,
+                temperature=author_temp,
+            )
+            revised_arg = Argument(
+                id=f"{arg.id}-rev",
+                agent_id=author.id,
+                stance=author.stance,
+                text=rev_out.text,
+                claims=rev_out.claims,
+                rebuts=arg.rebuts,
+                evidence_ids=rev_out.evidence_ids,
+                confidence=rev_out.confidence,
+            )
+            rnd.arguments.append(revised_arg)
+            _emit(on_event, "argument", revised_arg.model_dump())
 
 
 async def run_debate(
@@ -116,21 +176,26 @@ async def run_debate(
     profile: str | None = None,
     on_event: EventCallback = None,
     complete_fn: CompleteFn = complete,
+    all_roles: bool = False,
+    enable_critic: bool = True,
+    critic_threshold: float = CRITIC_THRESHOLD,
 ) -> Debate:
-    """Run a debate from question to schema-valid Debate with Verdict."""
+    """Run a personality-shaped debate with optional Critic scoring and revision loop."""
     usage_tracker.reset()
     debate_id = str(uuid.uuid4())[:8]
-    agents = _create_default_agents(num_advocates=num_agents, profile=profile)
-    advocates = [a for a in agents if a.role == "advocate"]
+    factory = AgentFactory(profile=profile)
+
+    agents = factory.create_debate_agents(num_advocates=num_agents, all_roles=all_roles)
+    debaters = [a for a in agents if a.role in DEBATER_ROLES]
+    debaters_by_id = {a.id: a for a in debaters}
+    moderator = next(a for a in agents if a.role == "moderator")
+    critic = next((a for a in agents if a.role == "critic"), None)
+    judge = next(a for a in agents if a.role == "judge")
 
     config = DebateConfig(
-        num_agents=num_agents,
+        num_agents=len(debaters),
         rounds=num_rounds,
-        models={
-            "moderator": get_raw_model_id("moderator", profile),
-            "debater": get_raw_model_id("debater", profile),
-            "judge": get_raw_model_id("judge", profile),
-        },
+        models=factory.get_model_map(),
         aggregation="majority",
     )
 
@@ -148,37 +213,40 @@ async def run_debate(
 
     _emit(on_event, "debate_started", {"id": debate_id, "question": question})
 
-    # 1. Moderator restates question and confirms stance assignments
-    mod_prompt = _load_prompt("moderator")
-    agent_desc = ", ".join(f"{a.id} ({a.name}, default={a.stance})" for a in advocates)
+    # 1. Moderator restates question and confirms stances
+    mod_sys = factory.get_system_prompt(moderator)
+    agent_desc = ", ".join(
+        f"{a.id} ({a.name}, role={a.role}, default={a.stance})" for a in debaters
+    )
     mod_output: ModeratorOutput = await complete_fn(
         role="moderator",
-        system=mod_prompt,
+        system=mod_sys,
         messages=[
             {
                 "role": "user",
-                "content": f"Question: {question}\n\nAdvocates: {agent_desc}",
+                "content": f"Question: {question}\n\nDebaters: {agent_desc}",
             }
         ],
         schema=ModeratorOutput,
         profile=profile,
+        temperature=factory.get_temperature("moderator"),
     )
 
     assignment_map = {item.agent_id: item.stance for item in mod_output.assignments}
-    for adv in advocates:
-        if adv.id in assignment_map:
-            adv.stance = assignment_map[adv.id]
+    for deb in debaters:
+        if deb.id in assignment_map:
+            deb.stance = assignment_map[deb.id]
 
     # 2. Opening round
-    adv_prompt_template = _load_prompt("advocate")
     opening = Round(number=1, kind="opening", arguments=[])
     _emit(on_event, "round_started", {"round": 1, "kind": "opening"})
 
-    for adv in advocates:
-        _emit(on_event, "agent_thinking", {"agent_id": adv.id})
-        sys_prompt = adv_prompt_template.replace("{{stance}}", adv.stance.upper())
-        adv_out: AdvocateOutput = await complete_fn(
-            role="debater",
+    for deb in debaters:
+        _emit(on_event, "agent_thinking", {"agent_id": deb.id})
+        sys_prompt = factory.get_system_prompt(deb)
+        model_role = "debater" if deb.role == "advocate" else deb.role
+        out: AdvocateOutput = await complete_fn(
+            role=model_role,
             system=sys_prompt,
             messages=[
                 {
@@ -187,26 +255,40 @@ async def run_debate(
                         f"Question: {question}\n"
                         f"Moderator framing: {mod_output.restated_question}\n"
                         f"Sub-claims: {mod_output.sub_claims}\n\n"
-                        f"Deliver your opening statement for the {adv.stance.upper()} side "
+                        f"Deliver your opening statement for the {deb.stance.upper()} side "
                         "with 3 key points."
                     ),
                 }
             ],
             schema=AdvocateOutput,
             profile=profile,
+            temperature=factory.get_temperature(deb.role),
         )
         arg = Argument(
-            id=f"arg-{debate_id}-1-{adv.id}",
-            agent_id=adv.id,
-            stance=adv.stance,
-            text=adv_out.text,
-            claims=adv_out.claims,
+            id=f"arg-{debate_id}-1-{deb.id}",
+            agent_id=deb.id,
+            stance=deb.stance,
+            text=out.text,
+            claims=out.claims,
             rebuts=[],
-            evidence_ids=adv_out.evidence_ids,
-            confidence=adv_out.confidence,
+            evidence_ids=out.evidence_ids,
+            confidence=out.confidence,
         )
         opening.arguments.append(arg)
         _emit(on_event, "argument", arg.model_dump())
+
+    if enable_critic and critic is not None:
+        await _run_critic_and_revise(
+            question=question,
+            rnd=opening,
+            critic=critic,
+            debaters_by_id=debaters_by_id,
+            factory=factory,
+            profile=profile,
+            critic_threshold=critic_threshold,
+            on_event=on_event,
+            complete_fn=complete_fn,
+        )
 
     debate.rounds.append(opening)
 
@@ -216,15 +298,16 @@ async def run_debate(
         rnd = Round(number=round_num, kind="rebuttal", arguments=[])
         _emit(on_event, "round_started", {"round": round_num, "kind": "rebuttal"})
 
-        for adv in advocates:
-            _emit(on_event, "agent_thinking", {"agent_id": adv.id})
+        for deb in debaters:
+            _emit(on_event, "agent_thinking", {"agent_id": deb.id})
             transcript = _format_transcript(debate, mod_output)
             opp_ids = [
-                a.id for prev in debate.rounds for a in prev.arguments if a.stance != adv.stance
+                a.id for prev in debate.rounds for a in prev.arguments if a.stance != deb.stance
             ]
-            sys_prompt = adv_prompt_template.replace("{{stance}}", adv.stance.upper())
-            adv_out = await complete_fn(
-                role="debater",
+            sys_prompt = factory.get_system_prompt(deb)
+            model_role = "debater" if deb.role == "advocate" else deb.role
+            out = await complete_fn(
+                role=model_role,
                 system=sys_prompt,
                 messages=[
                     {
@@ -233,39 +316,52 @@ async def run_debate(
                             f"Question: {question}\n\n"
                             f"Transcript so far:\n{transcript}\n\n"
                             f"This is Rebuttal Round {rebuttal_idx}. Identify and attack your "
-                            f"opponent's weakest point while defending {adv.stance.upper()}. "
+                            f"opponent's weakest point while defending {deb.stance.upper()}. "
                             f"Opponent argument IDs available to rebut: {opp_ids}"
                         ),
                     }
                 ],
                 schema=AdvocateOutput,
                 profile=profile,
+                temperature=factory.get_temperature(deb.role),
             )
-            rebuts = [rid for rid in adv_out.rebuts if rid in opp_ids] or opp_ids[-1:]
+            rebuts = [rid for rid in out.rebuts if rid in opp_ids] or opp_ids[-1:]
             arg = Argument(
-                id=f"arg-{debate_id}-{round_num}-{adv.id}",
-                agent_id=adv.id,
-                stance=adv.stance,
-                text=adv_out.text,
-                claims=adv_out.claims,
+                id=f"arg-{debate_id}-{round_num}-{deb.id}",
+                agent_id=deb.id,
+                stance=deb.stance,
+                text=out.text,
+                claims=out.claims,
                 rebuts=rebuts,
-                evidence_ids=adv_out.evidence_ids,
-                confidence=adv_out.confidence,
+                evidence_ids=out.evidence_ids,
+                confidence=out.confidence,
             )
             rnd.arguments.append(arg)
             _emit(on_event, "argument", arg.model_dump())
 
+        if enable_critic and critic is not None:
+            await _run_critic_and_revise(
+                question=question,
+                rnd=rnd,
+                critic=critic,
+                debaters_by_id=debaters_by_id,
+                factory=factory,
+                profile=profile,
+                critic_threshold=critic_threshold,
+                on_event=on_event,
+                complete_fn=complete_fn,
+            )
+
         debate.rounds.append(rnd)
 
     # 4. Judge verdict
-    judge = next(a for a in agents if a.role == "judge")
     _emit(on_event, "agent_thinking", {"agent_id": judge.id})
-    judge_prompt = _load_prompt("judge")
+    judge_sys = factory.get_system_prompt(judge)
     full_transcript = _format_transcript(debate, mod_output)
 
     judge_out: JudgeOutput = await complete_fn(
         role="judge",
-        system=judge_prompt,
+        system=judge_sys,
         messages=[
             {
                 "role": "user",
@@ -278,6 +374,7 @@ async def run_debate(
         ],
         schema=JudgeOutput,
         profile=profile,
+        temperature=factory.get_temperature("judge"),
     )
 
     verdict = Verdict(

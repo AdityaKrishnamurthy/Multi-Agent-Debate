@@ -11,7 +11,7 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 | 003 | [Repo setup & conventions](003-repo-setup-and-conventions.md) | Phase 1 (Part A) | — | In progress |
 | 004 | [Frontend shell + mock debate](004-frontend-shell-and-mock-debate.md) | **Phase 1** | 003-A | Done |
 | 005 | [Debate engine MVP (CLI)](005-debate-engine-mvp.md) | **Phase 1** | 003-A, 004 (schema types) | Done |
-| 006 | [Personality-shaped agents](006-personality-shaped-agents.md) | Phase 1 / 2 | 005 | Not started |
+| 006 | [Personality-shaped agents](006-personality-shaped-agents.md) | Phase 1 / 2 | 005 | Done |
 | 007 | [Backend API & live streaming](007-backend-api-and-streaming.md) | Phase 2 | 005, 006, 003-B | Not started |
 | 008 | [Evidence retrieval (RAG)](008-evidence-retrieval-rag.md) | Phase 2 | 007 | Not started |
 | 009 | [Critic & citation verification](009-critic-and-citation-verification.md) | Phase 2 | 006, 008 | Not started |

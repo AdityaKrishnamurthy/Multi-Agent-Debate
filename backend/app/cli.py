@@ -1,8 +1,8 @@
 """
-CLI entrypoint — run a debate from the terminal (005 §Step 7).
+CLI entrypoint — run a debate from the terminal (005 / 006).
 
 Usage:
-    uv run python -m app.cli "question" --rounds 2 --agents 2 [--profile groq]
+    uv run python -m app.cli "question" --rounds 2 --agents 2 [--all-roles] [--profile groq]
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 
 from app.engine.debate import run_debate
@@ -52,7 +53,9 @@ def _print_event(event: str, data: dict[str, Any]) -> None:
     elif event == "argument":
         stance = data.get("stance", "neutral")
         color = "green" if stance == "pro" else "red" if stance == "con" else "yellow"
-        title = f"[{color}]{stance.upper()}[/{color}] — {data.get('agent_id', '')}"
+        is_rev = str(data.get("id", "")).endswith("-rev")
+        rev_tag = " [REVISION]" if is_rev else ""
+        title = f"[{color}]{stance.upper()}{rev_tag}[/{color}] — {data.get('agent_id', '')}"
         conf = data.get("confidence", 0.0)
         console.print(
             Panel(
@@ -64,6 +67,17 @@ def _print_event(event: str, data: dict[str, Any]) -> None:
         )
         for claim in data.get("claims", []):
             console.print(f"  - {claim}")
+    elif event == "critique":
+        score = float(data.get("score", 0.0))
+        color = "green" if score >= 3.5 else "yellow" if score >= 2.5 else "red"
+        console.print(
+            f"  [bold {color}]Critic ({data.get('argument_id', '')}): "
+            f"{score:.1f}/5.0[/bold {color}]"
+        )
+        for issue in data.get("issues", []):
+            issue_type = escape(str(issue.get("type", "")))
+            issue_note = escape(str(issue.get("note", "")))
+            console.print(f"    ! \\[{issue_type}] {issue_note}")
     elif event == "verdict":
         console.print(
             Panel(
@@ -91,6 +105,8 @@ async def _run_cli(args: argparse.Namespace) -> Debate:
         num_rounds=args.rounds,
         profile=args.profile,
         on_event=_print_event,
+        all_roles=args.all_roles,
+        enable_critic=not args.no_critic,
     )
 
     runs_dir = Path(__file__).resolve().parent.parent / "runs"
@@ -112,10 +128,16 @@ async def _run_cli(args: argparse.Namespace) -> Debate:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Multi-Agent Debate CLI (MVP)")
+    parser = argparse.ArgumentParser(description="Multi-Agent Debate CLI")
     parser.add_argument("question", help="Question to debate")
     parser.add_argument("--rounds", type=int, default=2, help="Number of rebuttal rounds")
-    parser.add_argument("--agents", type=int, default=2, help="Number of advocates")
+    parser.add_argument("--agents", type=int, default=2, help="Number of debating agents")
+    parser.add_argument(
+        "--all-roles",
+        action="store_true",
+        help="Include all 5 MAPS roles (Moderator, Advocate, Scholar, Explorer, Critic) + Judge",
+    )
+    parser.add_argument("--no-critic", action="store_true", help="Disable Critic scoring loop")
     parser.add_argument("--profile", default=None, help="Model profile (groq/kaggle/local)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logs")
     args = parser.parse_args()
