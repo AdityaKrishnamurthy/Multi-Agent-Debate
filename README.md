@@ -191,6 +191,36 @@ npm run lint && npx tsc --noEmit && npm run build
 
 GitHub Actions runs the same checks, including migrations against Postgres, on every push and pull request. Contributors and coding agents should read [`AGENTS.md`](AGENTS.md) first.
 
+## Deploying
+
+### Frontend on Vercel
+
+1. Import the repository at [vercel.com/new](https://vercel.com/new).
+2. Set **Root Directory** to `frontend`. The framework (Next.js) and build settings come from `frontend/vercel.json`.
+3. Add the environment variable `NEXT_PUBLIC_API_URL` with your backend's public **https** URL.
+4. Deploy.
+
+Without a backend URL the site still works: the sample debates replay from JSON, and **Start debate** explains that the server can't be reached.
+
+### Backend
+
+The API keeps a debate running in the background and streams it for several minutes, so it needs a long-running server rather than Vercel's serverless functions. Any host that runs a Python web service with Postgres works, such as Render, Railway or Fly.io:
+
+```bash
+cd backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Set the provider keys from `.env.example`, plus:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | `postgresql+asyncpg://USER:PASSWORD@HOST:5432/DB`, on a Postgres with the `vector` extension (e.g. Neon or Supabase) |
+| `CORS_ORIGINS` | your Vercel URL, e.g. `https://multi-agent-debate.vercel.app` |
+| `CORS_ORIGIN_REGEX` | optional, to allow preview deployments: `https://.*\.vercel\.app` |
+
 ## Acknowledgements
 
 Built on *MAPS: Multi-Agent Personality Shaping for Collaborative Reasoning* (arXiv:2503.16905). Debate design draws on Du et al. (2023), Liang et al. (2023), Irving et al. (2018) and Khan et al. (2024).
