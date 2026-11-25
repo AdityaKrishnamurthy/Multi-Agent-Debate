@@ -186,3 +186,45 @@ async def test_all_five_maps_roles_run_together():
     assert {"moderator", "advocate", "scholar", "explorer", "critic", "judge"} <= agent_roles
     assert {"moderator", "debater", "scholar", "explorer", "critic", "judge"} <= seen_roles
     assert debate.verdict is not None
+
+
+@pytest.mark.asyncio
+async def test_debate_started_carries_shell_with_final_stances_and_given_id():
+    async def fake_complete(role, system, messages, schema, **kwargs):
+        if schema is ModeratorOutput:
+            return ModeratorOutput(
+                restated_question="Q?",
+                sub_claims=[],
+                assignments=[
+                    StanceAssignment(agent_id="advocate-1", stance="con"),
+                    StanceAssignment(agent_id="advocate-2", stance="pro"),
+                ],
+            )
+        if schema is AdvocateOutput:
+            return AdvocateOutput(
+                text="t", claims=["c"], rebuts=[], evidence_ids=[], confidence=0.5
+            )
+        if schema is JudgeOutput:
+            return JudgeOutput(
+                decision="Con wins",
+                confidence=0.6,
+                reasoning="r",
+                winning_points=[],
+                open_disagreements=[],
+            )
+        raise AssertionError(schema)
+
+    events: list[tuple[str, dict]] = []
+    await run_debate(
+        question="Q?",
+        num_rounds=0,
+        on_event=lambda ev, data: events.append((ev, data)),
+        complete_fn=fake_complete,
+        enable_critic=False,
+        debate_id="fixed-id",
+    )
+    name, data = events[0]
+    assert name == "debate_started"
+    assert data["id"] == "fixed-id"
+    stances = {a["id"]: a["stance"] for a in data["debate"]["agents"]}
+    assert stances["advocate-1"] == "con" and stances["advocate-2"] == "pro"

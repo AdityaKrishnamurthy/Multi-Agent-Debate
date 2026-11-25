@@ -179,10 +179,14 @@ async def run_debate(
     all_roles: bool = False,
     enable_critic: bool = True,
     critic_threshold: float = CRITIC_THRESHOLD,
+    debate_id: str | None = None,
 ) -> Debate:
-    """Run a personality-shaped debate with optional Critic scoring and revision loop."""
+    """Run a personality-shaped debate with optional Critic scoring and revision loop.
+
+    `debate_id` lets a caller (the API) choose the id up front; otherwise one is generated.
+    """
     usage_tracker.reset()
-    debate_id = str(uuid.uuid4())[:8]
+    debate_id = debate_id or str(uuid.uuid4())[:8]
     factory = AgentFactory(profile=profile)
 
     agents = factory.create_debate_agents(num_advocates=num_agents, all_roles=all_roles)
@@ -211,8 +215,6 @@ async def run_debate(
         created_at=datetime.now(UTC).isoformat(),
     )
 
-    _emit(on_event, "debate_started", {"id": debate_id, "question": question})
-
     # 1. Moderator restates question and confirms stances
     mod_sys = factory.get_system_prompt(moderator)
     agent_desc = ", ".join(
@@ -236,6 +238,14 @@ async def run_debate(
     for deb in debaters:
         if deb.id in assignment_map:
             deb.stance = assignment_map[deb.id]
+
+    # Announce the debate once stances are final, with the full shell (agents, config)
+    # so live clients can lay out the Pro/Con columns before the first argument.
+    _emit(
+        on_event,
+        "debate_started",
+        {"id": debate_id, "question": question, "debate": debate.model_dump(mode="json")},
+    )
 
     # 2. Opening round
     opening = Round(number=1, kind="opening", arguments=[])
