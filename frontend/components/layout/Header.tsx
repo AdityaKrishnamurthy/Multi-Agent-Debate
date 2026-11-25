@@ -2,63 +2,64 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Moon, Scale, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/layout/ThemeProvider";
+
+export function LogoMark({ className = "size-7" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 28 28" aria-hidden="true" className={className}>
+      <rect x="0" y="0" width="13" height="28" rx="4" fill="var(--pro)" />
+      <rect x="15" y="0" width="13" height="28" rx="4" fill="var(--con)" />
+    </svg>
+  );
+}
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const onHome = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/75">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-85"
-          >
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Scale className="size-4" />
-            </span>
-            <span className="text-base">Multi-Agent Debate</span>
-          </Link>
-          <Badge variant="secondary" className="hidden sm:inline-flex">
-            Phase 1 Demo
-          </Badge>
-        </div>
+    <header className="sticky top-0 z-40 border-b border-rule bg-background/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-6 px-4 sm:px-8">
+        <Link
+          href="/"
+          className="flex items-center gap-3 whitespace-nowrap rounded-md text-base font-bold tracking-tight text-foreground sm:text-[17px]"
+        >
+          <LogoMark />
+          Multi-Agent Debate
+        </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav aria-label="Main" className="ml-auto flex items-center gap-1">
           <Button
-            variant={pathname === "/" ? "secondary" : "ghost"}
+            variant={onHome ? "secondary" : "ghost"}
             size="sm"
             nativeButton={false}
             render={<Link href="/" />}
           >
-            New Debate
-          </Button>
-          <Button
-            variant={pathname?.startsWith("/debate") ? "secondary" : "ghost"}
-            size="sm"
-            nativeButton={false}
-            render={<Link href="/debate/4day-week?demo=1" />}
-          >
-            Sample Debate
+            New debate
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            nativeButton={false}
+            render={<Link href="/#samples" />}
+            className="hidden sm:inline-flex"
+          >
+            Sample debates
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={toggleTheme}
             aria-label={
-              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+              theme === "dark"
+                ? "Switch to light theme"
+                : "Switch to dark theme"
             }
           >
-            {theme === "dark" ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
+            {theme === "dark" ? <Sun /> : <Moon />}
           </Button>
         </nav>
       </div>
