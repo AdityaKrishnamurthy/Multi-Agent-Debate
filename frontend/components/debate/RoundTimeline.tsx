@@ -1,86 +1,79 @@
 "use client";
 
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
-import type { Round, RoundKind } from "@/lib/types";
+import { Check } from "lucide-react";
+import { roundLabel } from "@/lib/debate-display";
+import type { RoundKind } from "@/lib/types";
 
 interface RoundTimelineProps {
   totalRounds: number;
-  rounds: Round[];
+  kinds: RoundKind[];
   currentRound: number;
-  currentKind: RoundKind | "verdict" | null;
   hasVerdict: boolean;
+  onJump?: (round: number | "verdict") => void;
 }
 
+/** One segmented row; each step restyles in place as the debate advances. */
 export function RoundTimeline({
   totalRounds,
-  rounds,
+  kinds,
   currentRound,
-  currentKind,
   hasVerdict,
+  onJump,
 }: RoundTimelineProps) {
-  const steps = [
-    { key: "r1", number: 1, label: "Opening" },
-    ...Array.from({ length: Math.max(1, totalRounds - 1) }, (_, i) => ({
-      key: `r${i + 2}`,
-      number: i + 2,
-      label: `Rebuttal ${i + 1}`,
+  const steps: { key: number | "verdict"; label: string }[] = [
+    ...Array.from({ length: Math.max(1, totalRounds) }, (_, i) => ({
+      key: i + 1,
+      label: roundLabel(kinds[i] ?? (i === 0 ? "opening" : "rebuttal"), i + 1),
     })),
-    { key: "verdict", number: totalRounds + 1, label: "Verdict" },
+    { key: "verdict" as const, label: "Verdict" },
   ];
 
   return (
-    <div
-      aria-label="Debate timeline"
-      className="flex items-center justify-between gap-2 overflow-x-auto rounded-xl border bg-card px-4 py-3"
+    <ol
+      aria-label="Debate progress"
+      className="grid overflow-hidden rounded-lg border border-input"
+      style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
     >
-      {steps.map((step, idx) => {
-        const isVerdictStep = step.key === "verdict";
-        const isCompleted = isVerdictStep
+      {steps.map((step) => {
+        const isVerdict = step.key === "verdict";
+        const n = isVerdict ? Infinity : (step.key as number);
+        const done = hasVerdict || (!isVerdict && currentRound > n);
+        const active = isVerdict
           ? hasVerdict
-          : hasVerdict ||
-            currentRound > step.number ||
-            (rounds.some((r) => r.number === step.number) &&
-              currentRound === step.number &&
-              currentKind === "verdict");
-        const isActive = isVerdictStep
-          ? !hasVerdict && currentKind === "verdict"
-          : !hasVerdict && currentRound === step.number;
+          : !hasVerdict && currentRound === n;
+        const reachable = done || active;
+        const state = active ? "active" : done ? "done" : "todo";
 
         return (
-          <div
-            key={step.key}
-            className="flex flex-1 items-center gap-2 min-w-0"
+          <li
+            key={String(step.key)}
+            className="border-r border-input last:border-r-0"
           >
-            <div className="flex items-center gap-2 shrink-0">
-              {isCompleted ? (
-                <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-              ) : isActive ? (
-                <Loader2 className="size-4 animate-spin text-primary" />
-              ) : (
-                <Circle className="size-4 text-muted-foreground/50" />
+            <button
+              type="button"
+              disabled={!reachable || !onJump}
+              onClick={() => onJump?.(step.key)}
+              aria-current={active ? "step" : undefined}
+              className={`flex h-11 w-full items-center justify-center gap-2 px-2 text-sm font-semibold transition-colors duration-200 disabled:cursor-default sm:justify-start sm:px-4 ${
+                state === "active"
+                  ? "bg-foreground text-background"
+                  : state === "done"
+                    ? "text-foreground hover:bg-panel"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {state === "done" && <Check className="hidden size-4 sm:block" />}
+              {state === "active" && !isVerdict && (
+                <span
+                  aria-hidden="true"
+                  className="hidden size-2 animate-pulse rounded-full bg-background sm:block"
+                />
               )}
-              <span
-                className={`text-xs sm:text-sm font-medium whitespace-nowrap ${
-                  isActive
-                    ? "text-foreground"
-                    : isCompleted
-                      ? "text-emerald-700 dark:text-emerald-300"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {idx < steps.length - 1 && (
-              <div
-                className={`h-px flex-1 min-w-4 ${
-                  isCompleted ? "bg-emerald-500/50" : "bg-border"
-                }`}
-              />
-            )}
-          </div>
+              <span className="truncate">{step.label}</span>
+            </button>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }

@@ -13,24 +13,46 @@ export const MOCK_DEBATES: Record<string, Debate> = {
   nuclear: debateNuclear,
 };
 
-export const SAMPLE_QUESTIONS = [
+export const SAMPLE_QUESTIONS: SampleQuestion[] = [
   {
     id: "4day-week",
     question: "Should our college switch to a 4-day week?",
-    tag: "Campus Policy",
+    tag: "Campus policy",
+    origin: "sample",
   },
   {
     id: "fasting",
     question: "Does intermittent fasting improve long-term weight loss?",
-    tag: "Health & Science",
+    tag: "Health and science",
+    origin: "sample",
   },
   {
     id: "nuclear",
     question:
       "Is nuclear energy essential for achieving net-zero carbon emissions by 2050?",
-    tag: "Live CLI Run",
+    tag: "Energy policy",
+    origin: "real",
   },
 ];
+
+export interface SampleQuestion {
+  id: string;
+  question: string;
+  tag: string;
+  origin: DebateOrigin;
+}
+
+/** "sample" = hand-written demo with illustrative sources; "real" = saved CLI run. */
+export type DebateOrigin = "sample" | "real";
+
+export const ORIGIN_LABEL: Record<DebateOrigin, string> = {
+  sample: "Sample debate · illustrative sources",
+  real: "Real Groq run",
+};
+
+export function debateOrigin(id: string): DebateOrigin {
+  return SAMPLE_QUESTIONS.find((s) => s.id === id)?.origin ?? "sample";
+}
 
 /**
  * Match any typed user question to the closest mock debate by simple keyword match,

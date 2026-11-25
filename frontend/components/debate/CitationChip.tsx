@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { FileText } from "lucide-react";
 
 interface CitationChipProps {
   evidenceId: string;
@@ -18,14 +17,13 @@ export function CitationChip({
     <button
       type="button"
       onClick={() => onSelect(evidenceId)}
-      className={`mx-0.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-xs font-medium transition-colors cursor-pointer ${
+      aria-label={`Open source ${evidenceId}`}
+      className={`tabular mx-0.5 inline-flex h-[1.4em] translate-y-[-1px] cursor-pointer items-center rounded border px-1.5 align-middle font-sans text-[12px] font-semibold leading-none transition-colors ${
         active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+          ? "border-foreground bg-foreground text-background"
+          : "border-input bg-panel text-foreground hover:border-foreground"
       }`}
-      title={`Inspect source ${evidenceId}`}
     >
-      <FileText className="size-3" />
       {evidenceId}
     </button>
   );
@@ -47,10 +45,9 @@ export function renderTextWithCitations(
     if (!match) {
       return <React.Fragment key={idx}>{part}</React.Fragment>;
     }
-
     const ids = match[1].split(",").map((s) => s.trim());
     return (
-      <span key={idx} className="inline-flex flex-wrap items-center">
+      <React.Fragment key={idx}>
         {ids.map((id) => (
           <CitationChip
             key={`${idx}-${id}`}
@@ -59,7 +56,7 @@ export function renderTextWithCitations(
             active={activeEvidenceId === id}
           />
         ))}
-      </span>
+      </React.Fragment>
     );
   });
 }

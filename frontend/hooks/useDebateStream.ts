@@ -20,6 +20,8 @@ export interface UseDebateStreamResult {
   thinkingAgentId: string | null;
   events: DebateStreamEvent[];
   isDemoMode: boolean;
+  /** Total rounds the debate will have (known up front in replay mode). */
+  expectedRounds: number;
   skipToEnd: () => void;
   replay: () => void;
 }
@@ -276,6 +278,10 @@ export function useDebateStream(
     thinkingAgentId,
     events,
     isDemoMode,
+    expectedRounds: Math.max(
+      sourceDebate.rounds.length,
+      debate?.rounds.length ?? 0
+    ),
     skipToEnd,
     replay,
   };
