@@ -33,6 +33,40 @@ profiles:
       scholar: "qwen2.5:3b"
       explorer: "qwen2.5:3b"
 
+# When every key for a provider is rate-limited, calls switch to these models
+# (only if that provider has a key in .env). Model IDs are full LiteLLM ids.
+fallbacks:
+  groq:
+    - "mistral/ministral-14b-latest"
+  mistral:
+    - "groq/openai/gpt-oss-20b"
+
+# Client-side pacing (requests per minute) for models with very low free-tier limits.
+# Mistral's free tier: 2 requests/minute per model; mistral-small/medium and
+# magistral are 0/minute on the free tier, so they are not used.
+rate_limits:
+  "mistral/ministral-14b-latest": 2
+
+# Models offered in the UI for the debaters. Each one was tested with structured
+# debate calls (valid JSON 4/4). Entries whose provider has no key in .env are hidden.
+debate_models:
+  - id: "groq/openai/gpt-oss-20b"
+    label: "GPT-OSS 20B"
+    provider: "Groq"
+    note: "Fast. The default."
+  - id: "groq/openai/gpt-oss-120b"
+    label: "GPT-OSS 120B"
+    provider: "Groq"
+    note: "Strongest reasoning; uses more of the rate limit."
+  - id: "groq/qwen/qwen3.8-27b"
+    label: "Qwen 3.8 27B"
+    provider: "Groq"
+    note: "A different model family from the judge."
+  - id: "mistral/ministral-14b-latest"
+    label: "Ministral 14B"
+    provider: "Mistral"
+    note: "Free tier allows 2 calls a minute, so debates take longer."
+
 defaults:
   profile: groq
   temperature: 0.7

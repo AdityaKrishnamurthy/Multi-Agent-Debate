@@ -10,8 +10,37 @@ import httpx
 import litellm
 import pytest
 
-from app.llm import complete, usage_tracker
+from app.llm import complete, key_pool, throttle, usage_tracker
 from app.schemas import AdvocateOutput
+
+KEY_VARS = [f"{p}_API_KEY{s}" for p in ("GROQ", "MISTRAL") for s in ("", "_2", "_3")]
+
+
+@pytest.fixture(autouse=True)
+def isolated_keys(monkeypatch):
+    """Tests control exactly which API keys exist; never use the real .env keys."""
+    for name in KEY_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-1")
+    key_pool.reset()
+    throttle.reset()
+    yield
+    key_pool.reset()
+    throttle.reset()
+
+
+def _rate_error(retry_after: str = "0.5"):
+    return litellm.RateLimitError(
+        message="Rate limit",
+        llm_provider="groq",
+        model="groq/openai/gpt-oss-20b",
+        response=httpx.Response(429, headers={"retry-after": retry_after}),
+    )
+
+
+VALID_ADVOCATE = json.dumps(
+    {"text": "OK.", "claims": ["C1"], "rebuts": [], "evidence_ids": [], "confidence": 0.6}
+)
 
 
 def _fake_response(content: str, total_tokens: int = 100):
@@ -116,3 +145,78 @@ async def test_complete_waits_on_rate_limit():
 
     assert result.text == "After backoff."
     mock_sleep.assert_awaited_once_with(0.5)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_rotates_to_second_key_without_sleeping(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY_2", "test-groq-2")
+    mock_acompletion = AsyncMock(side_effect=[_rate_error("30"), _fake_response(VALID_ADVOCATE)])
+    mock_sleep = AsyncMock()
+    with (
+        patch("app.llm.litellm.acompletion", mock_acompletion),
+        patch("app.llm.asyncio.sleep", mock_sleep),
+    ):
+        result = await complete(
+            role="debater", system="S", messages=[], schema=AdvocateOutput, profile="groq"
+        )
+    assert result.text == "OK."
+    keys_used = [c.kwargs["api_key"] for c in mock_acompletion.await_args_list]
+    assert keys_used == ["test-groq-1", "test-groq-2"]
+    mock_sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_all_groq_keys_limited_falls_back_to_mistral(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral")
+    usage_tracker.reset()
+    mock_acompletion = AsyncMock(side_effect=[_rate_error("30"), _fake_response(VALID_ADVOCATE)])
+    mock_sleep = AsyncMock()
+    with (
+        patch("app.llm.litellm.acompletion", mock_acompletion),
+        patch("app.llm.asyncio.sleep", mock_sleep),
+    ):
+        await complete(
+            role="debater", system="S", messages=[], schema=AdvocateOutput, profile="groq"
+        )
+    second = mock_acompletion.await_args_list[1].kwargs
+    assert second["model"].startswith("mistral/")
+    assert second["api_key"] == "test-mistral"
+    assert second["response_format"] == {"type": "json_object"}
+    assert usage_tracker.fallbacks == 1
+    mock_sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_model_override_is_used():
+    mock_acompletion = AsyncMock(return_value=_fake_response(VALID_ADVOCATE))
+    with patch("app.llm.litellm.acompletion", mock_acompletion):
+        await complete(
+            role="debater",
+            system="S",
+            messages=[],
+            schema=AdvocateOutput,
+            model="groq/qwen/qwen3.8-27b",
+        )
+    assert mock_acompletion.await_args.kwargs["model"] == "groq/qwen/qwen3.8-27b"
+
+
+@pytest.mark.asyncio
+async def test_low_limit_model_is_paced_not_failed(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral")
+    mock_acompletion = AsyncMock(return_value=_fake_response(VALID_ADVOCATE))
+    mock_sleep = AsyncMock()
+    with (
+        patch("app.llm.litellm.acompletion", mock_acompletion),
+        patch("app.llm.asyncio.sleep", mock_sleep),
+    ):
+        for _ in range(2):
+            await complete(
+                role="debater",
+                system="S",
+                messages=[],
+                schema=AdvocateOutput,
+                model="mistral/ministral-14b-latest",
+            )
+    # 2 requests/minute: the second call waits about 30 seconds instead of hitting a 429.
+    assert mock_sleep.await_count == 1
+    assert 25 < mock_sleep.await_args.args[0] <= 30
