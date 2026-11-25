@@ -70,6 +70,15 @@ rate_limits:
   "mistral/ministral-14b-latest": 2
   nvidia_nim: 40 # NVIDIA NIM free tier: 40 requests/minute per account
 
+# Per-model overrides. Reasoning models (Nemotron, MiniMax) write long hidden
+# reasoning before the answer; with the default 2048 tokens a long transcript can
+# leave the answer empty.
+model_settings:
+  "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b": { max_tokens: 8192 }
+  "nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b": { max_tokens: 8192 }
+  "nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b": { max_tokens: 8192 }
+  "nvidia_nim/minimaxai/minimax-m3.1-flash": { max_tokens: 8192 }
+
 # Models offered in the UI for the debaters. Each one was tested with structured
 # debate calls (valid JSON 4/4). Entries whose provider has no key in .env are hidden.
 debate_models:

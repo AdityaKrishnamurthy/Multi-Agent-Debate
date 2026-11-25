@@ -275,3 +275,33 @@ async def test_fallback_never_returns_to_a_model_already_tried(monkeypatch):
     # retries NIM rather than bouncing back to Groq.
     assert models[2] == models[1]
     assert any(c.args[0] >= 25 for c in mock_sleep.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_repeated_invalid_json_falls_back_to_another_model(monkeypatch):
+    monkeypatch.setenv("NVIDIA_NIM_API_KEY", "test-nim")
+    mock_acompletion = AsyncMock(
+        side_effect=[_fake_response(""), _fake_response(""), _fake_response(VALID_ADVOCATE)]
+    )
+    with patch("app.llm.litellm.acompletion", mock_acompletion):
+        result = await complete(
+            role="debater", system="S", messages=[], schema=AdvocateOutput, profile="groq"
+        )
+    assert result.text == "OK."
+    models = [c.kwargs["model"] for c in mock_acompletion.await_args_list]
+    assert models[0] == models[1] and models[2].startswith("nvidia_nim/")
+
+
+@pytest.mark.asyncio
+async def test_reasoning_model_gets_larger_token_budget(monkeypatch):
+    monkeypatch.setenv("NVIDIA_NIM_API_KEY", "test-nim")
+    mock_acompletion = AsyncMock(return_value=_fake_response(VALID_ADVOCATE))
+    with patch("app.llm.litellm.acompletion", mock_acompletion):
+        await complete(
+            role="debater",
+            system="S",
+            messages=[],
+            schema=AdvocateOutput,
+            model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
+        )
+    assert mock_acompletion.await_args.kwargs["max_tokens"] == 8192

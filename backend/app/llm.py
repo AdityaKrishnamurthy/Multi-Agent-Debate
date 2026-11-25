@@ -380,7 +380,13 @@ async def complete(
         kw: dict[str, Any] = {
             "model": litellm_model,
             "temperature": temp,
-            "max_tokens": max_tok,
+            # Reasoning models think before answering and need a larger budget, or the
+            # answer comes back empty (models.yaml model_settings).
+            "max_tokens": (
+                max_tokens
+                if max_tokens is not None
+                else config.get("model_settings", {}).get(mid, {}).get("max_tokens", max_tok)
+            ),
             "messages": msgs,
         }
         if fmt is not None:
@@ -487,6 +493,11 @@ async def complete(
 
         except (ValidationError, json.JSONDecodeError) as exc:
             if parse_attempts >= max_retries:
+                # This model keeps returning invalid or empty JSON (reasoning models can
+                # spend the whole token budget thinking): let another model take the turn.
+                if switch_to_fallback("Invalid JSON"):
+                    parse_attempts = 0
+                    continue
                 raise
             parse_attempts += 1
             logger.warning(
