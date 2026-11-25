@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { API_URL } from "@/lib/api";
 import { getMockDebate } from "@/lib/mock-debates";
 import type {
   Argument,
@@ -12,6 +13,25 @@ import type {
 
 export type StreamStatus = "idle" | "streaming" | "complete" | "error";
 
+export interface StreamError {
+  message: string;
+  retryAfter?: number;
+}
+
+/** Event names the live API sends (plan 007). */
+const LIVE_EVENTS = [
+  "debate_started",
+  "round_started",
+  "agent_thinking",
+  "argument",
+  "critique",
+  "evidence_added",
+  "vote",
+  "verdict",
+  "error",
+  "end",
+] as const;
+
 export interface UseDebateStreamResult {
   debate: Debate | null;
   status: StreamStatus;
@@ -20,6 +40,8 @@ export interface UseDebateStreamResult {
   thinkingAgentId: string | null;
   events: DebateStreamEvent[];
   isDemoMode: boolean;
+  /** Set when a live debate fails (rate limit, bad key, server unreachable). */
+  error: StreamError | null;
   /** Total rounds the debate will have (known up front in replay mode). */
   expectedRounds: number;
   skipToEnd: () => void;
@@ -166,7 +188,8 @@ export function useDebateStream(
 ): UseDebateStreamResult {
   const sourceDebate = getMockDebate(id);
   const customQuestion = options?.customQuestion?.trim();
-  const isDemoMode = true; // Phase 1 mock replay; Plan 007 wires EventSource here
+  // Demo = replay a recorded JSON debate; otherwise stream a live one from the API.
+  const isDemoMode = options?.demo ?? true;
 
   const initialShell = useCallback((): Debate => {
     return {
@@ -178,7 +201,9 @@ export function useDebateStream(
     };
   }, [sourceDebate, customQuestion]);
 
-  const [debate, setDebate] = useState<Debate | null>(initialShell);
+  const [debate, setDebate] = useState<Debate | null>(() =>
+    isDemoMode ? initialShell() : null
+  );
   const [status, setStatus] = useState<StreamStatus>("streaming");
   const [currentRound, setCurrentRound] = useState<number>(0);
   const [currentKind, setCurrentKind] = useState<RoundKind | "verdict" | null>(
@@ -186,6 +211,7 @@ export function useDebateStream(
   );
   const [thinkingAgentId, setThinkingAgentId] = useState<string | null>(null);
   const [events, setEvents] = useState<DebateStreamEvent[]>([]);
+  const [error, setError] = useState<StreamError | null>(null);
   const [runSeed, setRunSeed] = useState(0);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -197,7 +223,25 @@ export function useDebateStream(
     timersRef.current = [];
   }, []);
 
+  /** Shared by replay and live mode: update UI state for one event. */
+  const handleEvent = useCallback((ev: DebateStreamEvent) => {
+    setEvents((prev) => [...prev, ev]);
+    if (ev.type === "agent_thinking") {
+      setThinkingAgentId(ev.data.agent_id);
+    } else {
+      setThinkingAgentId(null);
+    }
+    if (ev.type === "round_started") {
+      setCurrentRound(ev.data.round);
+      setCurrentKind(ev.data.kind);
+    } else if (ev.type === "verdict") {
+      setCurrentKind("verdict");
+    }
+    setDebate((prev) => (prev ? applyEvent(prev, ev) : prev));
+  }, []);
+
   const skipToEnd = useCallback(() => {
+    if (!isDemoMode) return;
     clearTimers();
     setDebate({
       ...sourceDebate,
@@ -209,14 +253,16 @@ export function useDebateStream(
     setCurrentKind(sourceDebate.verdict ? "verdict" : null);
     setThinkingAgentId(null);
     setStatus("complete");
-  }, [clearTimers, sourceDebate, customQuestion]);
+  }, [isDemoMode, clearTimers, sourceDebate, customQuestion]);
 
   const replay = useCallback(() => {
     clearTimers();
     setRunSeed((n) => n + 1);
   }, [clearTimers]);
 
+  // Demo mode: replay the recorded JSON with timed delays.
   useEffect(() => {
+    if (!isDemoMode) return;
     clearTimers();
 
     const resetTimer = setTimeout(() => {
@@ -238,24 +284,7 @@ export function useDebateStream(
       const isLast = i === plan.length - 1;
 
       const timer = setTimeout(() => {
-        const ev = step.event;
-        setEvents((prev) => [...prev, ev]);
-
-        if (ev.type === "agent_thinking") {
-          setThinkingAgentId(ev.data.agent_id);
-        } else {
-          setThinkingAgentId(null);
-        }
-
-        if (ev.type === "round_started") {
-          setCurrentRound(ev.data.round);
-          setCurrentKind(ev.data.kind);
-        } else if (ev.type === "verdict") {
-          setCurrentKind("verdict");
-        }
-
-        setDebate((prev) => (prev ? applyEvent(prev, ev) : prev));
-
+        handleEvent(step.event);
         if (isLast) {
           setStatus("complete");
           setThinkingAgentId(null);
@@ -268,7 +297,87 @@ export function useDebateStream(
     return () => {
       clearTimers();
     };
-  }, [clearTimers, initialShell, sourceDebate, runSeed]);
+  }, [
+    isDemoMode,
+    clearTimers,
+    initialShell,
+    sourceDebate,
+    runSeed,
+    handleEvent,
+  ]);
+
+  // Live mode: stream the debate from the API over Server-Sent Events.
+  useEffect(() => {
+    if (isDemoMode) return;
+
+    let finished = false;
+    let gotAny = false;
+    const source = new EventSource(`${API_URL}/api/debates/${id}/stream`);
+
+    const reset = setTimeout(() => {
+      setDebate(null);
+      setStatus("streaming");
+      setCurrentRound(0);
+      setCurrentKind(null);
+      setThinkingAgentId(null);
+      setEvents([]);
+      setError(null);
+    }, 0);
+
+    const onMessage =
+      (type: (typeof LIVE_EVENTS)[number]) => (e: MessageEvent) => {
+        gotAny = true;
+        const data = JSON.parse(e.data);
+        if (type === "debate_started") {
+          const shell = data.debate as Debate;
+          setDebate({ ...shell, rounds: [], evidence: [], verdict: null });
+          return;
+        }
+        if (type === "end") {
+          finished = true;
+          source.close();
+          setThinkingAgentId(null);
+          setStatus((s) => (s === "error" ? s : "complete"));
+          return;
+        }
+        if (type === "error") {
+          setError({ message: data.message, retryAfter: data.retry_after });
+          setStatus("error");
+          setThinkingAgentId(null);
+          return;
+        }
+        handleEvent({ type, data } as DebateStreamEvent);
+      };
+
+    for (const type of LIVE_EVENTS) {
+      source.addEventListener(type, onMessage(type) as EventListener);
+    }
+    source.onerror = () => {
+      // EventSource reconnects on its own (resuming via Last-Event-ID) unless closed.
+      if (finished) return;
+      if (source.readyState === EventSource.CLOSED || !gotAny) {
+        source.close();
+        setError({
+          message:
+            "Can't reach the debate server. Start the backend API, then reload this page.",
+        });
+        setStatus("error");
+      }
+    };
+
+    return () => {
+      clearTimeout(reset);
+      finished = true;
+      source.close();
+    };
+  }, [isDemoMode, id, runSeed, handleEvent]);
+
+  const expectedRounds = isDemoMode
+    ? Math.max(sourceDebate.rounds.length, debate?.rounds.length ?? 0)
+    : Math.max(
+        debate ? debate.config.rounds + 1 : 0,
+        debate?.rounds.length ?? 0
+      );
 
   return {
     debate,
@@ -278,10 +387,8 @@ export function useDebateStream(
     thinkingAgentId,
     events,
     isDemoMode,
-    expectedRounds: Math.max(
-      sourceDebate.rounds.length,
-      debate?.rounds.length ?? 0
-    ),
+    error,
+    expectedRounds,
     skipToEnd,
     replay,
   };

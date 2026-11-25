@@ -88,6 +88,10 @@ export function matchMockDebateId(question: string): string {
   return "4day-week";
 }
 
+export function isMockId(id: string): boolean {
+  return id in MOCK_DEBATES;
+}
+
 export function getMockDebate(id: string): Debate {
   return MOCK_DEBATES[id] ?? debate4DayWeek;
 }

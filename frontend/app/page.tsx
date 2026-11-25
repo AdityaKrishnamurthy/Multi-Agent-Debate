@@ -17,6 +17,7 @@ import {
 } from "@/components/debate/SettingsDrawer";
 import { SideTag } from "@/components/debate/SideTag";
 import { VoteSplitBar } from "@/components/debate/VoteSplitBar";
+import { ApiError, createDebate } from "@/lib/api";
 import { scrollToHomeSection } from "@/lib/scroll";
 import {
   MOCK_DEBATES,
@@ -66,8 +67,37 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleStart = (e: React.FormEvent) => {
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  // Start a live debate through the API (plan 007).
+  const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = question.trim();
+    if (trimmed.length < 5) {
+      setStartError("Type a question of at least a few words first.");
+      return;
+    }
+    setStarting(true);
+    setStartError(null);
+    try {
+      const id = await createDebate({
+        question: trimmed,
+        num_agents: settings.numAgents,
+        rebuttals: Math.max(0, settings.rounds - 1),
+        all_roles: settings.numAgents >= 3,
+      });
+      router.push(`/debate/${id}`);
+    } catch (err) {
+      setStartError(
+        err instanceof ApiError ? err.message : "Couldn't start the debate."
+      );
+      setStarting(false);
+    }
+  };
+
+  // Offline fallback: replay the closest recorded sample for the typed question.
+  const replayClosestSample = () => {
     const trimmed = question.trim() || SAMPLE_QUESTIONS[0].question;
     const sampleId = matchMockDebateId(trimmed);
     const params = new URLSearchParams({
@@ -132,18 +162,39 @@ export default function HomePage() {
                 {settings.numAgents} agents · {settings.rounds} rounds ·{" "}
                 {aggregationLabel(settings.aggregation)}
               </span>
-              <Button type="submit" size="lg" className="ml-auto">
-                Start debate
+              <Button
+                type="submit"
+                size="lg"
+                className="ml-auto"
+                disabled={starting}
+              >
+                {starting ? "Starting…" : "Start debate"}
                 <ArrowRight />
               </Button>
             </div>
           </form>
 
-          <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-            <Info className="mt-0.5 size-4 shrink-0" />
-            Demo mode: your question replays the closest sample debate below.
-            Live debates arrive with the backend API.
-          </p>
+          {startError ? (
+            <div
+              role="alert"
+              className="mt-4 rounded-lg bg-flag-soft px-4 py-3 text-[15px] leading-relaxed"
+            >
+              <p>{startError}</p>
+              <button
+                type="button"
+                onClick={replayClosestSample}
+                className="mt-1 font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground"
+              >
+                Replay the closest sample debate instead
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              Debates run live on Groq models and take a few minutes. To see one
+              instantly, replay a sample below.
+            </p>
+          )}
         </section>
 
         <aside aria-labelledby="how-heading" className="lg:pt-3">

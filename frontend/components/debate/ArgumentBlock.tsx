@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { CircleCheck, TriangleAlert } from "lucide-react";
+import { CircleCheck, PencilLine, TriangleAlert } from "lucide-react";
 import { renderTextWithCitations } from "@/components/debate/CitationChip";
 import { SideTag } from "@/components/debate/SideTag";
 import { pct } from "@/lib/debate-display";
@@ -51,6 +51,8 @@ export function ArgumentBlock({
   const isTyping = visible < argument.text.length;
   const claims = argument.claims.filter((c) => c.trim().length > 0);
   const critique = argument.critique;
+  // The engine appends a Critic-forced rewrite as "<original id>-rev" in the same round.
+  const isRevision = argument.id.endsWith("-rev");
   const flagged = critique ? critique.score < CRITIC_PASS : false;
 
   return (
@@ -62,6 +64,12 @@ export function ArgumentBlock({
       className="min-w-0"
     >
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        {isRevision && (
+          <span className="inline-flex h-6 items-center gap-1.5 rounded bg-muted px-2 text-xs font-bold text-foreground">
+            <PencilLine className="size-3.5" />
+            Revised after Critic review
+          </span>
+        )}
         <span className="flex items-center gap-2 md:hidden">
           <SideTag side={argument.stance} />
           <span className="font-semibold text-foreground">{agent?.name}</span>

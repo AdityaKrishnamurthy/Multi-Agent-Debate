@@ -9,6 +9,7 @@ import {
   FastForward,
   Loader2,
   RotateCcw,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArgumentBlock } from "@/components/debate/ArgumentBlock";
@@ -16,8 +17,8 @@ import { EvidenceList, EvidencePanel } from "@/components/debate/EvidencePanel";
 import { RoundTimeline } from "@/components/debate/RoundTimeline";
 import { SideTag } from "@/components/debate/SideTag";
 import { VerdictBox, VerdictDetails } from "@/components/debate/VerdictView";
-import { useDebateStream } from "@/hooks/useDebateStream";
-import { ORIGIN_LABEL, debateOrigin } from "@/lib/mock-debates";
+import { useDebateStream, type StreamError } from "@/hooks/useDebateStream";
+import { ORIGIN_LABEL, debateOrigin, isMockId } from "@/lib/mock-debates";
 import {
   ROLE_LABEL,
   aggregationLabel,
@@ -59,6 +60,42 @@ function AgentHead({ agent }: { agent: Agent }) {
   );
 }
 
+function StreamErrorNotice({ error }: { error: StreamError }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-xl bg-flag-soft px-5 py-4 text-[15px] leading-relaxed"
+    >
+      <p className="flex items-center gap-2 font-semibold">
+        <TriangleAlert className="size-4 text-flag" />
+        The debate stopped
+      </p>
+      <p className="mt-1">
+        {error.message}
+        {error.retryAfter
+          ? ` Try again in about ${Math.ceil(error.retryAfter)} seconds.`
+          : ""}
+      </p>
+      <p className="mt-2">
+        <Link
+          href="/"
+          className="font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground"
+        >
+          Start a new debate
+        </Link>{" "}
+        or{" "}
+        <Link
+          href="/#samples"
+          className="font-semibold underline decoration-input underline-offset-4 hover:decoration-foreground"
+        >
+          replay a sample
+        </Link>
+        .
+      </p>
+    </div>
+  );
+}
+
 function Drafting({ name }: { name: string }) {
   return (
     <p className="flex items-center gap-2 py-2 text-[15px] text-muted-foreground">
@@ -72,7 +109,8 @@ export function DebateWorkspace({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const customQuestion = searchParams.get("q") ?? undefined;
   const paramAgg = searchParams.get("agg");
-  const demo = searchParams.get("demo") !== "0";
+  // Recorded samples replay from JSON; any other id is a live debate from the API.
+  const demo = isMockId(id) || searchParams.get("demo") === "1";
 
   const {
     debate,
@@ -81,6 +119,7 @@ export function DebateWorkspace({ id }: { id: string }) {
     thinkingAgentId,
     isDemoMode,
     expectedRounds,
+    error,
     skipToEnd,
     replay,
   } = useDebateStream(id, { customQuestion, demo });
@@ -154,8 +193,17 @@ export function DebateWorkspace({ id }: { id: string }) {
 
   if (!debate) {
     return (
-      <div className="mx-auto max-w-[1440px] px-8 py-16 text-[15px] text-muted-foreground">
-        Loading debate…
+      <div className="mx-auto max-w-[1440px] px-4 py-16 sm:px-8">
+        {error ? (
+          <StreamErrorNotice error={error} />
+        ) : (
+          <p className="flex items-center gap-2 text-[15px] text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            {isDemoMode
+              ? "Loading debate…"
+              : "Starting the debate. The moderator is assigning sides…"}
+          </p>
+        )}
       </div>
     );
   }
@@ -237,7 +285,15 @@ export function DebateWorkspace({ id }: { id: string }) {
                 <BookOpen />
                 Sources ({debate.evidence.length})
               </Button>
-              {status === "streaming" ? (
+              {status === "streaming" && !isDemoMode ? (
+                <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-input px-3 text-sm font-semibold">
+                  <span
+                    aria-hidden="true"
+                    className="size-2 animate-pulse rounded-full bg-con"
+                  />
+                  Live
+                </span>
+              ) : status === "streaming" ? (
                 <Button variant="outline" size="sm" onClick={skipToEnd}>
                   <FastForward />
                   Skip to verdict
@@ -250,6 +306,12 @@ export function DebateWorkspace({ id }: { id: string }) {
               )}
             </div>
           </div>
+
+          {error && (
+            <div className="mt-5">
+              <StreamErrorNotice error={error} />
+            </div>
+          )}
 
           <div className="mt-6">
             <RoundTimeline
