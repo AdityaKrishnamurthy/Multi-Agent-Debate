@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FileUp, Info } from "lucide-react";
+import { ArrowRight, FileUp, Info, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -60,9 +60,23 @@ const STEPS = [
   },
 ];
 
+const DEBATE_TOPIC_SUGGESTIONS = [
+  "Should AI-generated art be eligible for copyright protection?",
+  "Should social media platforms verify users' ages?",
+  "Should cities make public transit free for everyone?",
+  "Should schools ban smartphones during the school day?",
+  "Is nuclear energy essential for reaching net-zero emissions?",
+  "Should a 4-day workweek become the standard?",
+  "Should public college tuition be free?",
+  "Should animal testing for cosmetics be banned worldwide?",
+  "Should remote work be the default for office jobs?",
+  "Should the voting age be lowered to 16?",
+];
+
 export default function HomePage() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
+  const [topicSuggestionIndex, setTopicSuggestionIndex] = useState(-1);
   const [settings, setSettings] = useState<DebateSettings>(DEFAULT_SETTINGS);
   const [models, setModels] = useState<DebateModelOption[]>([]);
 
@@ -91,6 +105,13 @@ export default function HomePage() {
 
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+
+  const suggestNextTopic = () => {
+    const nextIndex = (topicSuggestionIndex + 1) % DEBATE_TOPIC_SUGGESTIONS.length;
+    setQuestion(DEBATE_TOPIC_SUGGESTIONS[nextIndex]);
+    setTopicSuggestionIndex(nextIndex);
+    setStartError(null);
+  };
 
   // Start a live debate through the API (plan 007).
   const handleStart = async (e: React.FormEvent) => {
@@ -184,6 +205,24 @@ export default function HomePage() {
                   }
                 />
                 <TooltipContent>PDF evidence arrives in Phase 2</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Suggest a debate topic (${((topicSuggestionIndex + 1) % DEBATE_TOPIC_SUGGESTIONS.length) + 1} of ${DEBATE_TOPIC_SUGGESTIONS.length})`}
+                      onClick={suggestNextTopic}
+                    >
+                      <Lightbulb />
+                    </Button>
+                  }
+                />
+                <TooltipContent>
+                  Cycle through 10 debate topic ideas
+                </TooltipContent>
               </Tooltip>
               <span className="tabular hidden min-w-0 truncate text-sm text-muted-foreground xl:inline">
                 {settings.numAgents} agents · {settings.rounds} rounds ·{" "}
