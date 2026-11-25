@@ -28,6 +28,10 @@ class Settings:
             for o in _env("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
         ]
     )
+    # Optional regex for extra origins, e.g. Vercel previews: https://.*\.vercel\.app
+    cors_origin_regex: str | None = field(
+        default_factory=lambda: os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
+    )
     llm_profile: str | None = field(default_factory=lambda: os.getenv("LLM_PROFILE") or None)
     # Cost guards: Groq free-tier limits are per organisation, so keep debates small and serial.
     max_agents: int = field(default_factory=lambda: int(_env("MAX_AGENTS", "5")))

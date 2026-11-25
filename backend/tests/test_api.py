@@ -57,6 +57,7 @@ def make_settings(**overrides) -> Settings:
         max_agents=5,
         max_rebuttals=3,
         max_concurrent_debates=1,
+        cors_origin_regex=r"https://.*\.vercel\.app",
     )
     base.update(overrides)
     return Settings(**base)
@@ -257,3 +258,17 @@ async def test_postgres_store_round_trip():
         assert [e.seq for e in await store.list_events(debate.id)] == [1]
     finally:
         await store.close()
+
+
+async def test_cors_allows_configured_origins(client_factory):
+    client = await client_factory()
+    for origin, allowed in [
+        ("http://localhost:3000", True),
+        ("https://multi-agent-debate-git-main.vercel.app", True),
+        ("https://evil.example.com", False),
+    ]:
+        resp = await client.options(
+            "/api/health",
+            headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
+        )
+        assert (resp.headers.get("access-control-allow-origin") == origin) is allowed
