@@ -36,7 +36,7 @@ User question (+ optional PDFs)
 | Structured output | **Pydantic** v2 models + Groq JSON-schema output | 005 |
 | API | **FastAPI** + SSE (`StreamingResponse`) | 007 |
 | Jobs | asyncio tasks → Arq/Redis only if needed | 007 |
-| DB | **PostgreSQL + pgvector** through Docker (see PLANS.md open question 1) | 007 |
+| DB | **PostgreSQL + pgvector** through Docker in every environment (PLANS.md decision, 2026-11-25) | 007 |
 | Embeddings | `bge-small-en-v1.5` or `all-MiniLM-L6-v2` (sentence-transformers, run locally) | 008 |
 | Search | Tavily API, Wikipedia, arXiv, Semantic Scholar | 008 |
 | PDF parsing | PyMuPDF | 008 |
