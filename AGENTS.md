@@ -14,7 +14,7 @@
 ## Git Workflow
 - Commit once per meaningful unit of work, such as a feature, a step group or a fix. A single commit for a whole plan is too coarse, and one commit per file is too fine. Most plans should end up with several commits.
 - Each commit should leave the repo working (build, lint and tests pass for the touched area), so any commit can be reverted on its own.
-- Use Conventional Commits with the plan number in the scope where it applies, e.g. `feat(007): SSE stream endpoint`, `fix(005): retry on JSON parse error`, `docs(plans): mark 006 done`.
+- Write short, plain commit messages in the imperative, e.g. `Add debate API with live streaming`, `Fix header navigation scrolling`, `Update plan status`. Don't use prefixes like `feat:`, `fix(...)`, `docs:` or `chore:`, and keep it to one line unless a body is really needed.
 - Keep unrelated changes in separate commits. For example, don't mix a refactor with a new feature, or a dependency bump with logic changes.
 - Commit dependency additions (`pyproject.toml`/`uv.lock`, `package.json`/`package-lock.json`) together with the code that first uses them.
 - Never commit secrets (`.env`), generated output (`backend/runs/`, `.next/`, `node_modules/`) or `resources/`.
