@@ -39,6 +39,13 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
   - Frontend: lint, type check and build pass.
   - In the browser, Start debate ran a live Groq debate (2 agents, 2 rebuttals, about 2.5 minutes) that streamed round by round into the UI and ended in a verdict. After a page refresh it replays from Postgres.
   - If the API is unreachable, the home page explains this and offers a sample replay.
+- **Model providers (2026-11-25):**
+  - 10 debate models across Groq, NVIDIA NIM, TokenHarbor and Mistral passed structured tests.
+  - Ruled out:
+    - Mistral small, medium and magistral are blocked on the free tier.
+    - TokenHarbor's GLM and Qwen flash models need a paid plan.
+    - Several NIM models timed out or returned 404.
+  - A live Nemotron debate run from the UI reached its verdict.
 - **Not yet verified:** CI on GitHub runs only after the next push.
 - **Outside the numbered plans:**
   - Frontend redesign: light default theme, facing Pro/Con columns, a verdict rail, honest sample labels and a favicon, recorded in `PRODUCT.md` and `DESIGN.md`.
@@ -60,6 +67,7 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 | 2026-11-25 | Frontend design system recorded in `DESIGN.md` (light default; cobalt = Pro, burnt orange = Con; Public Sans + Source Serif 4). Future UI work (007 live mode, 011) must follow it. |
 | 2026-11-25 | **Database = Postgres + pgvector through Docker in every environment** (resolves the old SQLite and Chroma question). `docker compose up -d db`, then `uv run alembic upgrade head`. |
 | 2026-11-25 | The API runs one debate at a time (`MAX_CONCURRENT_DEBATES=1`) because Groq free-tier limits are per organisation. Every event is persisted, so a stream can be replayed after the debate ends or after a restart. |
+| 2026-11-25 | **Multi-provider free tiers with fallback.** Debates can run on Groq, NVIDIA NIM, TokenHarbor (free models) or Mistral, chosen per debate in the UI. On a 429, timeout, server error or invalid JSON, a call rotates to the provider's next key (`*_API_KEY_2`, ...) and then along the fallback chain in `models.yaml`. Only models that passed structured debate tests are offered. |
 | 2026-11-24 | 012/014 retrieval runs over the datasets' own corpora (FEVER Wikipedia, SciFact abstracts), not paid web search. Tavily's free credits are reserved for live demos. |
 
 ## Open questions

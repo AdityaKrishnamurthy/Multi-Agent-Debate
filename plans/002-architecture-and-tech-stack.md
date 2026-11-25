@@ -31,7 +31,7 @@ User question (+ optional PDFs)
 |---|---|---|
 | Language | Python 3.11+ (backend/ML), TypeScript (frontend) | 003 |
 | Python tooling | **uv**, **ruff** (lint + format), **pytest** | 003 |
-| LLM access | **LiteLLM** → Groq free tier (interactive), vLLM on Kaggle (bulk), Ollama (local), chosen by profile; see §Model backends | 005 |
+| LLM access | **LiteLLM** → Groq, NVIDIA NIM, TokenHarbor and Mistral free tiers (interactive, with key rotation and provider fallback), vLLM on Kaggle (bulk), Ollama (local); see §Model backends and `models.yaml` | 005 |
 | Orchestration | Plain async loop (005) → **LangGraph** (010) | 005 / 010 |
 | Structured output | **Pydantic** v2 models + Groq JSON-schema output | 005 |
 | API | **FastAPI** + SSE (`StreamingResponse`) | 007 |
