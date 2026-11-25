@@ -67,15 +67,3 @@ Multi-Agent-Debate/
 ├─ plans/                Numbered implementation plans
 └─ resources/            Papers (git-excluded)
 ```
-
-## Plans
-
-See [`plans/PLANS.md`](plans/PLANS.md) for the full list and status.
-
-## Conventions
-
-- **Branches:** `feat/<area>-<short>`, `fix/...`, `chore/...`
-- **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- **Secrets:** never committed; all in `.env`
-- **Prompts:** versioned in `backend/app/agents/prompts/*.md`
-- **Model IDs:** only in `backend/app/config/models.yaml`
