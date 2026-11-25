@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/layout/ThemeProvider";
+import { scrollToHomeSection, type HomeSection } from "@/lib/scroll";
 
 export function LogoMark({ className = "size-7" }: { className?: string }) {
   return (
@@ -18,13 +19,27 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const router = useRouter();
   const onHome = pathname === "/";
+
+  // On the home page, scroll in place (Next.js skips scrolling for same-route
+  // links). From other pages, navigate and let the home page scroll on arrival.
+  const go = (section: HomeSection) => (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (onHome) {
+      scrollToHomeSection(section);
+    } else {
+      router.push(section === "top" ? "/" : `/#${section}`);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-background/95 backdrop-blur-sm">
       <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-6 px-4 sm:px-8">
         <Link
           href="/"
+          onClick={go("top")}
           className="flex items-center gap-3 whitespace-nowrap rounded-md text-base font-bold tracking-tight text-foreground sm:text-[17px]"
         >
           <LogoMark />
@@ -36,7 +51,7 @@ export function Header() {
             variant={onHome ? "secondary" : "ghost"}
             size="sm"
             nativeButton={false}
-            render={<Link href="/" />}
+            render={<Link href="/" onClick={go("top")} />}
           >
             New debate
           </Button>
@@ -44,7 +59,7 @@ export function Header() {
             variant="ghost"
             size="sm"
             nativeButton={false}
-            render={<Link href="/#samples" />}
+            render={<Link href="/#samples" onClick={go("samples")} />}
             className="hidden sm:inline-flex"
           >
             Sample debates

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FileUp, Info } from "lucide-react";
@@ -17,6 +17,7 @@ import {
 } from "@/components/debate/SettingsDrawer";
 import { SideTag } from "@/components/debate/SideTag";
 import { VoteSplitBar } from "@/components/debate/VoteSplitBar";
+import { scrollToHomeSection } from "@/lib/scroll";
 import {
   MOCK_DEBATES,
   SAMPLE_QUESTIONS,
@@ -57,6 +58,13 @@ export default function HomePage() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [settings, setSettings] = useState<DebateSettings>(DEFAULT_SETTINGS);
+
+  // Arriving from another page via /#samples: jump once the list has rendered.
+  useEffect(() => {
+    if (window.location.hash === "#samples") {
+      requestAnimationFrame(() => scrollToHomeSection("samples"));
+    }
+  }, []);
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
