@@ -8,9 +8,9 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 |---|---|---|---|---|
 | 001 | [Project overview & scope](001-project-overview.md) | Phase 1 | — | Reference |
 | 002 | [Architecture, tech stack & shared schema](002-architecture-and-tech-stack.md) | Phase 1 | — | Reference |
-| 003 | [Repo setup & conventions](003-repo-setup-and-conventions.md) | Phase 1 (Part A) | — | In progress |
+| 003 | [Repo setup & conventions](003-repo-setup-and-conventions.md) | Phase 1 (Part A) | — | In progress: Part A done; Part B: GitHub repo ✓, Docker Compose + CI + branch protection pending |
 | 004 | [Frontend shell + mock debate](004-frontend-shell-and-mock-debate.md) | **Phase 1** | 003-A | Done |
-| 005 | [Debate engine MVP (CLI)](005-debate-engine-mvp.md) | **Phase 1** | 003-A, 004 (schema types) | Done |
+| 005 | [Debate engine MVP (CLI)](005-debate-engine-mvp.md) | **Phase 1** | 003-A, 004 (schema types) | Done (Phase 1 cut; step 8 has 2 of 5 saved runs) |
 | 006 | [Personality-shaped agents](006-personality-shaped-agents.md) | Phase 1 / 2 | 005 | Done |
 | 007 | [Backend API & live streaming](007-backend-api-and-streaming.md) | Phase 2 | 005, 006, 003-B | Not started |
 | 008 | [Evidence retrieval (RAG)](008-evidence-retrieval-rag.md) | Phase 2 | 007 | Not started |
@@ -30,8 +30,21 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 3. Run every drift check in **Git Bash** from the repo root, and every `uv ...` command from `backend/`.
 4. When a plan is finished, update its row in the table below.
 
-## Phase 1 critical path
-003-A → 004 → 005. Together these are estimated at about 6 days of work, and the review is a couple of days away. Both 004 and 005 therefore have a **Phase 1 cut** listing what is essential for the review. Everything else in them can follow afterwards.
+## Current position (2026-11-25)
+- **Implemented through plan 006.** 003 Part A, 004, 005 and 006 are done and merged on `main`.
+- **Next up: 003 Part B, then 007.** 007 needs Docker Compose (Postgres + pgvector) from 003 Part B. Docker Desktop is now installed and running.
+- **Verified on 2026-11-25:**
+  - frontend lint, type check and build pass, and the backend tests pass (10).
+  - a live CLI debate ran on Groq (2 agents, 2 rebuttals, about 3 min, about 44k tokens) with schema-valid JSON output.
+- **Outside the numbered plans:** the frontend was redesigned on 2026-11-25. The work included:
+  - a light default theme, working fonts and facing Pro/Con columns
+  - a verdict rail, honest labels for the sample debates, and a new favicon
+  - `PRODUCT.md` and `DESIGN.md`, which record the product context and the design system
+
+  Plan 011 builds on this design.
+
+## Phase 1 critical path (done)
+003-A → 004 → 005 (+ 006) are complete for the Phase 1 review.
 
 ## Decisions made
 | Date | Decision |
@@ -42,6 +55,7 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
 | 2026-11-24 | Plan 003 is split into Part A (local setup, before Phase 1) and Part B (GitHub repo, Docker, CI, deferred until 007). |
 | 2026-11-24 | **No paid API keys, ever.** The model backend is chosen by profile (002 §Model backends): `groq` free tier for 005–011 and demos, `kaggle` (vLLM + open 7–8B models on free GPUs) for 012–014, `local` (Ollama, 3B) for offline use. |
 | 2026-11-24 | Own-work contribution = **both** the own model (`mad-verifier`, 013, primary) and the own dataset (MAD-Transcripts, 012). |
+| 2026-11-25 | Frontend design system recorded in `DESIGN.md` (light default; cobalt = Pro, burnt orange = Con; Public Sans + Source Serif 4). Future UI work (007 live mode, 011) must follow it. |
 | 2026-11-24 | 012/014 retrieval runs over the datasets' own corpora (FEVER Wikipedia, SciFact abstracts), not paid web search. Tavily's free credits are reserved for live demos. |
 
 ## Open questions
