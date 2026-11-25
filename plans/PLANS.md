@@ -48,7 +48,7 @@ Every buildable plan has the same header: **Depends on**, **Drift check**, **All
   - A live Nemotron debate run from the UI reached its verdict.
 - **Not yet verified:** CI on GitHub runs only after the next push.
 - **Outside the numbered plans:**
-  - Frontend redesign: light default theme, facing Pro/Con columns, a verdict rail, honest sample labels and a favicon, recorded in `PRODUCT.md` and `DESIGN.md`.
+  - Frontend redesign: light default theme, facing Pro/Con columns, a verdict rail, honest sample labels and a favicon, recorded in `DESIGN.md`.
   - Header nav fix: reliable smooth scrolling.
   - README rewritten with setup steps and screenshots.
 

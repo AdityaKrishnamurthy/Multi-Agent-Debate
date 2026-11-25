@@ -173,7 +173,6 @@ Multi-Agent-Debate/
 │  ├─ lib/              shared types (mirror backend schemas), API client
 │  └─ mock/             sample debates
 ├─ docker-compose.yml   Postgres + pgvector
-├─ PRODUCT.md           product context
 └─ DESIGN.md            design system (colours, type, components)
 ```
 
