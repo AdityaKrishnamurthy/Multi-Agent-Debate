@@ -1,24 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  FileUp,
-  MessageSquare,
-  Scale,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, FileUp, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -29,26 +15,53 @@ import {
   SettingsDrawer,
   type DebateSettings,
 } from "@/components/debate/SettingsDrawer";
-import { SAMPLE_QUESTIONS, matchMockDebateId } from "@/lib/mock-debates";
+import { SideTag } from "@/components/debate/SideTag";
+import { VoteSplitBar } from "@/components/debate/VoteSplitBar";
+import {
+  MOCK_DEBATES,
+  SAMPLE_QUESTIONS,
+  matchMockDebateId,
+} from "@/lib/mock-debates";
+import {
+  aggregationLabel,
+  debaters,
+  pct,
+  splitDecision,
+  verdictSide,
+} from "@/lib/debate-display";
 
 const DEFAULT_SETTINGS: DebateSettings = {
   numAgents: 2,
   rounds: 3,
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   aggregation: "evidence_weighted",
   personalities: ["Extraversion (Assertive)", "Conscientiousness (Scholar)"],
 };
 
+const STEPS = [
+  {
+    title: "Opening",
+    body: "Each side states its position and its key claims, citing sources by number.",
+  },
+  {
+    title: "Rebuttals",
+    body: "Each side answers the other's weakest point. The Critic scores every argument from 0 to 5 and flags unsupported claims.",
+  },
+  {
+    title: "Verdict",
+    body: "Votes are weighted by argument strength into one decision, with a calibrated confidence score.",
+  },
+];
+
 export default function HomePage() {
   const router = useRouter();
-  const [question, setQuestion] = useState(SAMPLE_QUESTIONS[0].question);
+  const [question, setQuestion] = useState("");
   const [settings, setSettings] = useState<DebateSettings>(DEFAULT_SETTINGS);
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = question.trim() || SAMPLE_QUESTIONS[0].question;
     const sampleId = matchMockDebateId(trimmed);
-
     const params = new URLSearchParams({
       demo: "1",
       q: trimmed,
@@ -58,146 +71,165 @@ export default function HomePage() {
       agg: settings.aggregation,
       personalities: settings.personalities.join("|"),
     });
-
     router.push(`/debate/${sampleId}?${params.toString()}`);
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
-      <section className="space-y-3 text-center">
-        <Badge variant="secondary" className="gap-1.5 px-3 py-1">
-          <Sparkles className="size-3.5 text-primary" />
-          Personality-Shaped Adversarial Reasoning
-        </Badge>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Debate with Real Evidence, Not Gut Feelings
-        </h1>
-        <p className="mx-auto max-w-2xl text-sm sm:text-base text-muted-foreground">
-          Big Five personality-shaped agents argue Pro and Con across rounds, a
-          skeptical Critic audits every claim and citation, and a weighted
-          aggregator delivers a calibrated verdict.
-        </p>
-      </section>
+    <div className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-10 sm:px-8 sm:pt-16">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-16">
+        <section aria-labelledby="start-heading">
+          <h1
+            id="start-heading"
+            className="text-[2rem] font-bold leading-tight tracking-tight sm:text-[2.75rem]"
+          >
+            What should the agents debate?
+          </h1>
+          <p className="mt-4 max-w-[60ch] text-lg leading-relaxed text-muted-foreground">
+            Two AI advocates argue it over several rounds, a Critic checks every
+            claim and citation, and the group reaches one verdict with a
+            confidence score you can trace back to the arguments.
+          </p>
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <CardTitle>Start a Debate</CardTitle>
-              <CardDescription>
-                Enter any policy, scientific, or factual question below.
-              </CardDescription>
-            </div>
-            <SettingsDrawer settings={settings} onChange={setSettings} />
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <form onSubmit={handleStart} className="space-y-4">
+          <form
+            onSubmit={handleStart}
+            className="mt-8 rounded-xl border border-input bg-card shadow-[0_1px_2px_rgba(22,24,29,0.04),0_8px_24px_-12px_rgba(22,24,29,0.12)] focus-within:border-pro"
+          >
+            <label htmlFor="question" className="sr-only">
+              Debate question
+            </label>
             <Textarea
+              id="question"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="e.g., Should our college switch to a 4-day week?"
+              placeholder="e.g. Should our college switch to a 4-day week?"
               rows={3}
-              className="resize-none text-base"
-              aria-label="Debate question"
+              className="min-h-28 resize-none border-0 bg-transparent px-5 pt-5 text-xl leading-snug shadow-none focus-visible:ring-0 dark:bg-transparent md:text-xl"
             />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Try a recorded sample:
-              </span>
-              {SAMPLE_QUESTIONS.map((sample) => (
-                <button
-                  key={sample.id}
-                  type="button"
-                  onClick={() => setQuestion(sample.question)}
-                  className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${
-                    question.trim() === sample.question
-                      ? "border-primary bg-primary/10 text-primary font-medium"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  {sample.tag}: &ldquo;{sample.question}&rdquo;
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3 border-t border-rule px-4 py-3">
+              <SettingsDrawer settings={settings} onChange={setSettings} />
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <span tabIndex={0} className="inline-flex">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled
-                        className="gap-1.5"
-                      >
-                        <FileUp className="size-4" />
-                        Attach PDF Evidence
+                    <span tabIndex={0} className="inline-flex rounded-lg">
+                      <Button type="button" variant="ghost" size="sm" disabled>
+                        <FileUp />
+                        Attach PDF
                       </Button>
                     </span>
                   }
                 />
-                <TooltipContent>Coming in Phase 2</TooltipContent>
+                <TooltipContent>PDF evidence arrives in Phase 2</TooltipContent>
               </Tooltip>
-
-              <div className="flex items-center gap-3">
-                <span className="hidden sm:inline text-xs text-muted-foreground">
-                  {settings.numAgents} agents · {settings.rounds} rounds ·{" "}
-                  <span className="font-mono">{settings.aggregation}</span>
-                </span>
-                <Button type="submit" size="lg" className="gap-2">
-                  Start Debate
-                  <ArrowRight className="size-4" />
-                </Button>
-              </div>
+              <span className="tabular hidden min-w-0 truncate text-sm text-muted-foreground xl:inline">
+                {settings.numAgents} agents · {settings.rounds} rounds ·{" "}
+                {aggregationLabel(settings.aggregation)}
+              </span>
+              <Button type="submit" size="lg" className="ml-auto">
+                Start debate
+                <ArrowRight />
+              </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <MessageSquare className="size-4 text-emerald-600 dark:text-emerald-400" />
-              Adversarial Lanes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs leading-relaxed text-muted-foreground">
-            Pro and Con advocates shaped by Big Five traits clash over opening
-            statements and targeted rebuttals.
-          </CardContent>
-        </Card>
+          <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
+            <Info className="mt-0.5 size-4 shrink-0" />
+            Demo mode: your question replays the closest sample debate below.
+            Live debates arrive with the backend API.
+          </p>
+        </section>
 
-        <Card className="bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <ShieldCheck className="size-4 text-amber-600 dark:text-amber-400" />
-              Socratic Critic &amp; Citations
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs leading-relaxed text-muted-foreground">
-            Every claim links to clickable evidence cards [E#], while a Critic
-            flags unsupported leaps and cherry-picking.
-          </CardContent>
-        </Card>
+        <aside aria-labelledby="how-heading" className="lg:pt-3">
+          <h2 id="how-heading" className="text-lg font-semibold">
+            How a debate runs
+          </h2>
+          <ol className="mt-5 space-y-6">
+            {STEPS.map((step, idx) => (
+              <li key={step.title} className="grid grid-cols-[2rem_1fr] gap-3">
+                <span className="tabular flex size-8 items-center justify-center rounded-full border border-input text-sm font-semibold">
+                  {idx + 1}
+                </span>
+                <div>
+                  <h3 className="font-semibold">{step.title}</h3>
+                  <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">
+                    {step.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </div>
 
-        <Card className="bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Scale className="size-4 text-primary" />
-              Calibrated Verdict
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs leading-relaxed text-muted-foreground">
-            Collective voting combines argument strength with confidence
-            calibration, winning points, and open disagreements.
-          </CardContent>
-        </Card>
+      <section
+        id="samples"
+        aria-labelledby="samples-heading"
+        className="mt-20 scroll-mt-24"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2
+            id="samples-heading"
+            className="text-2xl font-bold tracking-tight"
+          >
+            Sample debates
+          </h2>
+          <p className="text-[15px] text-muted-foreground">
+            Replay a full debate, round by round, ending in its verdict.
+          </p>
+        </div>
+
+        <ul className="mt-6 divide-y divide-rule border-y border-rule">
+          {SAMPLE_QUESTIONS.map((sample) => {
+            const d = MOCK_DEBATES[sample.id];
+            const verdict = d.verdict;
+            const side = verdict ? verdictSide(verdict) : "draw";
+            const ruling = verdict
+              ? splitDecision(verdict.decision).ruling
+              : "";
+            return (
+              <li key={sample.id}>
+                <Link
+                  href={`/debate/${sample.id}?demo=1`}
+                  className="group grid grid-cols-1 items-center gap-4 rounded-md px-2 py-6 transition-colors hover:bg-panel sm:px-4 md:grid-cols-[minmax(0,1fr)_260px_auto]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold leading-snug group-hover:underline">
+                      {d.question}
+                    </p>
+                    <p className="mt-1.5 text-sm text-muted-foreground">
+                      {sample.tag} ·{" "}
+                      {sample.origin === "real"
+                        ? "Real Groq run"
+                        : "Sample, illustrative sources"}{" "}
+                      · {debaters(d).length} debaters · {d.rounds.length} rounds
+                      · {aggregationLabel(d.config.aggregation)}
+                      {d.evidence.length > 0
+                        ? ` · ${d.evidence.length} sources`
+                        : " · no sources"}
+                    </p>
+                  </div>
+                  {verdict && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <SideTag side={side} />
+                          <span className="truncate font-medium">{ruling}</span>
+                        </span>
+                        <span className="tabular shrink-0 font-semibold">
+                          {pct(verdict.confidence)}
+                        </span>
+                      </div>
+                      <VoteSplitBar verdict={verdict} />
+                    </div>
+                  )}
+                  <span className="hidden items-center gap-1.5 text-[15px] font-semibold md:inline-flex">
+                    Replay
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </section>
     </div>
   );
