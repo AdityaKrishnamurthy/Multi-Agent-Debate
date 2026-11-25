@@ -14,6 +14,32 @@ load_dotenv(ROOT / ".env")
 DEFAULT_DATABASE_URL = "postgresql+asyncpg://mad:mad@localhost:5432/mad"
 
 
+def normalize_database_url(url: str) -> str:
+    """Accept the connection string a host gives (Neon, Render, Supabase) as-is.
+
+    The async driver needs the "postgresql+asyncpg://" scheme and an "ssl" query
+    parameter instead of libpq's "sslmode"/"channel_binding".
+    """
+    url = url.strip()
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            url = "postgresql+asyncpg://" + url[len(prefix) :]
+            break
+    if "?" not in url:
+        return url
+    base, query = url.split("?", 1)
+    params = []
+    for part in query.split("&"):
+        key, _, value = part.partition("=")
+        if key == "sslmode":
+            params.append(f"ssl={value}")
+        elif key == "channel_binding" or not key:
+            continue
+        else:
+            params.append(part)
+    return base + ("?" + "&".join(params) if params else "")
+
+
 def _env(name: str, default: str) -> str:
     value = os.getenv(name, "").strip()
     return value or default
@@ -21,7 +47,9 @@ def _env(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    database_url: str = field(default_factory=lambda: _env("DATABASE_URL", DEFAULT_DATABASE_URL))
+    database_url: str = field(
+        default_factory=lambda: normalize_database_url(_env("DATABASE_URL", DEFAULT_DATABASE_URL))
+    )
     cors_origins: list[str] = field(
         default_factory=lambda: [
             o.strip()

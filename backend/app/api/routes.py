@@ -68,6 +68,12 @@ def _settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+@router.get("/ping")
+async def ping() -> dict[str, str]:
+    """Lightweight keep-alive for uptime monitors; does not touch the database."""
+    return {"status": "ok"}
+
+
 @router.get("/health")
 async def health(request: Request) -> dict[str, Any]:
     return {"status": "ok", "database": await _runner(request).store.ping()}

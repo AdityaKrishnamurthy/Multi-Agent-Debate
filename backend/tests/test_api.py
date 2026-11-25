@@ -272,3 +272,18 @@ async def test_cors_allows_configured_origins(client_factory):
             headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
         )
         assert (resp.headers.get("access-control-allow-origin") == origin) is allowed
+
+
+async def test_ping_does_not_need_the_database(client_factory):
+    client = await client_factory()
+    assert (await client.get("/api/ping")).json() == {"status": "ok"}
+
+
+def test_database_url_accepts_host_connection_strings():
+    from app.settings import normalize_database_url
+
+    neon = "postgresql://u:p@ep-x.neon.tech/db?sslmode=require&channel_binding=require"
+    assert normalize_database_url(neon) == "postgresql+asyncpg://u:p@ep-x.neon.tech/db?ssl=require"
+    assert normalize_database_url("postgres://u:p@h/db") == "postgresql+asyncpg://u:p@h/db"
+    local = "postgresql+asyncpg://mad:mad@localhost:5432/mad"
+    assert normalize_database_url(local) == local
