@@ -17,7 +17,12 @@ import {
 } from "@/components/debate/SettingsDrawer";
 import { SideTag } from "@/components/debate/SideTag";
 import { VoteSplitBar } from "@/components/debate/VoteSplitBar";
-import { ApiError, createDebate } from "@/lib/api";
+import {
+  ApiError,
+  createDebate,
+  getOptions,
+  type DebateModelOption,
+} from "@/lib/api";
 import { scrollToHomeSection } from "@/lib/scroll";
 import {
   MOCK_DEBATES,
@@ -35,8 +40,8 @@ import {
 const DEFAULT_SETTINGS: DebateSettings = {
   numAgents: 2,
   rounds: 3,
-  model: "openai/gpt-oss-120b",
-  aggregation: "evidence_weighted",
+  model: "",
+  aggregation: "majority",
   personalities: ["Extraversion (Assertive)", "Conscientiousness (Scholar)"],
 };
 
@@ -59,6 +64,23 @@ export default function HomePage() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [settings, setSettings] = useState<DebateSettings>(DEFAULT_SETTINGS);
+  const [models, setModels] = useState<DebateModelOption[]>([]);
+
+  // Verified debate models (and the default) come from the backend.
+  useEffect(() => {
+    let cancelled = false;
+    getOptions().then((opts) => {
+      if (cancelled || !opts) return;
+      setModels(opts.debate_models);
+      setSettings((s) => ({
+        ...s,
+        model: s.model || opts.default_debate_model,
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Arriving from another page via /#samples: jump once the list has rendered.
   useEffect(() => {
@@ -86,6 +108,7 @@ export default function HomePage() {
         num_agents: settings.numAgents,
         rebuttals: Math.max(0, settings.rounds - 1),
         all_roles: settings.numAgents >= 3,
+        model: settings.model || undefined,
       });
       router.push(`/debate/${id}`);
     } catch (err) {
@@ -144,7 +167,11 @@ export default function HomePage() {
               className="min-h-28 resize-none border-0 bg-transparent px-5 pt-5 text-xl leading-snug shadow-none focus-visible:ring-0 dark:bg-transparent md:text-xl"
             />
             <div className="flex flex-wrap items-center gap-3 border-t border-rule px-4 py-3">
-              <SettingsDrawer settings={settings} onChange={setSettings} />
+              <SettingsDrawer
+                settings={settings}
+                onChange={setSettings}
+                models={models}
+              />
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -191,8 +218,9 @@ export default function HomePage() {
           ) : (
             <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
               <Info className="mt-0.5 size-4 shrink-0" />
-              Debates run live on Groq models and take a few minutes. To see one
-              instantly, replay a sample below.
+              Debates run live on free-tier models (Groq by default; choose
+              another in Settings) and take a few minutes. To see one instantly,
+              replay a sample below.
             </p>
           )}
         </section>

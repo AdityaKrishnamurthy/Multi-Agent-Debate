@@ -20,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
+import type { DebateModelOption } from "@/lib/api";
 
 export interface DebateSettings {
   numAgents: number;
@@ -37,30 +38,44 @@ const PERSONALITY_OPTIONS = [
   "Neuroticism (Skeptic)",
 ];
 
-const MODEL_OPTIONS = [
-  { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (Groq)" },
-  { value: "openai/gpt-oss-120b", label: "GPT-OSS 120B (Groq)" },
-  { value: "qwen/qwen3-32b", label: "Qwen 3 32B (Groq)" },
-  {
-    value: "meta-llama/llama-4-scout-17b-16e-instruct",
-    label: "Llama 4 Scout 17B (Groq)",
-  },
-];
-
+// Only majority vote exists in the engine today; the rest arrive with plan 010.
 const AGGREGATION_OPTIONS = [
-  { value: "evidence_weighted", label: "Evidence-Weighted Vote (Ours)" },
-  { value: "majority", label: "Majority Vote" },
-  { value: "confidence_weighted", label: "Confidence-Weighted Vote" },
-  { value: "judge_panel", label: "Multi-Model Judge Panel" },
-  { value: "bayesian", label: "Bayesian per Sub-Claim" },
+  { value: "majority", label: "Majority vote", available: true },
+  {
+    value: "evidence_weighted",
+    label: "Evidence-weighted vote (plan 010)",
+    available: false,
+  },
+  {
+    value: "confidence_weighted",
+    label: "Confidence-weighted vote (plan 010)",
+    available: false,
+  },
+  { value: "judge_panel", label: "Judge panel (plan 010)", available: false },
+  {
+    value: "bayesian",
+    label: "Bayesian per sub-claim (plan 010)",
+    available: false,
+  },
 ];
 
 interface SettingsDrawerProps {
   settings: DebateSettings;
   onChange: (next: DebateSettings) => void;
+  /** Verified debate models from the backend; empty when it is unreachable. */
+  models: DebateModelOption[];
 }
 
-export function SettingsDrawer({ settings, onChange }: SettingsDrawerProps) {
+export function SettingsDrawer({
+  settings,
+  onChange,
+  models,
+}: SettingsDrawerProps) {
+  const modelItems = models.map((m) => ({
+    value: m.id,
+    label: `${m.label} · ${m.provider}`,
+  }));
+  const selectedModel = models.find((m) => m.id === settings.model);
   const handleAgentsChange = (val: number | readonly number[]) => {
     const count = Array.isArray(val) ? val[0] : val;
     const nextPersonalities = Array.from({ length: count }, (_, idx) => {
@@ -185,30 +200,48 @@ export function SettingsDrawer({ settings, onChange }: SettingsDrawerProps) {
           <Separator />
 
           <div className="space-y-2">
-            <Label>Primary Model</Label>
-            <Select
-              value={settings.model}
-              onValueChange={(v) => v && onChange({ ...settings, model: v })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MODEL_OPTIONS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Debater model</Label>
+            {models.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                The model list loads from the backend API, which isn&rsquo;t
+                reachable right now.
+              </p>
+            ) : (
+              <>
+                <Select
+                  items={modelItems}
+                  value={settings.model}
+                  onValueChange={(v) =>
+                    v && onChange({ ...settings, model: v as string })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modelItems.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {selectedModel?.note} The moderator, Critic and judge keep
+                  their own models. If a provider hits its rate limit, the
+                  debate switches to another provider automatically.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label>Aggregation Method</Label>
             <Select
+              items={AGGREGATION_OPTIONS}
               value={settings.aggregation}
               onValueChange={(v) =>
-                v && onChange({ ...settings, aggregation: v })
+                v && onChange({ ...settings, aggregation: v as string })
               }
             >
               <SelectTrigger className="w-full">
@@ -216,7 +249,11 @@ export function SettingsDrawer({ settings, onChange }: SettingsDrawerProps) {
               </SelectTrigger>
               <SelectContent>
                 {AGGREGATION_OPTIONS.map((a) => (
-                  <SelectItem key={a.value} value={a.value}>
+                  <SelectItem
+                    key={a.value}
+                    value={a.value}
+                    disabled={!a.available}
+                  >
                     {a.label}
                   </SelectItem>
                 ))}

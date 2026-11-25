@@ -9,6 +9,32 @@ export interface CreateDebateInput {
   num_agents: number;
   rebuttals: number;
   all_roles?: boolean;
+  /** Debater model id from getOptions().debate_models; omit for the default. */
+  model?: string;
+}
+
+export interface DebateModelOption {
+  id: string;
+  label: string;
+  provider: string;
+  note: string;
+}
+
+export interface ConfigOptions {
+  debate_models: DebateModelOption[];
+  default_debate_model: string;
+  aggregation_methods: { id: string; label: string; available: boolean }[];
+  limits: { max_agents: number; max_rebuttals: number };
+}
+
+/** Models and limits the backend offers. Returns null when the API is unreachable. */
+export async function getOptions(): Promise<ConfigOptions | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/config/options`);
+    return res.ok ? ((await res.json()) as ConfigOptions) : null;
+  } catch {
+    return null;
+  }
 }
 
 export class ApiError extends Error {
