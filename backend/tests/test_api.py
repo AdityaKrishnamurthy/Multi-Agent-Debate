@@ -119,6 +119,31 @@ async def test_health_and_options(client_factory):
     assert opts["limits"]["max_agents"] == 5
     assert any(m["id"] == "majority" and m["available"] for m in opts["aggregation_methods"])
     assert (await client.post("/api/documents")).status_code == 501
+    assert opts["default_debate_model"].startswith("groq/")
+
+
+async def test_model_choice_is_validated_and_applied(client_factory, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test")
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    client = await client_factory()
+    models = (await client.get("/api/config/options")).json()["debate_models"]
+    ids = [m["id"] for m in models]
+    assert "groq/openai/gpt-oss-20b" in ids
+    assert not any(i.startswith("mistral/") for i in ids)  # no Mistral key -> hidden
+
+    bad = {"question": "Which model?", "model": "mistral/ministral-14b-latest"}
+    assert (await client.post("/api/debates", json=bad)).status_code == 422
+
+    chosen = "groq/qwen/qwen3.8-27b"
+    debate_id = (
+        await client.post("/api/debates", json={"question": "Which model?", "model": chosen})
+    ).json()["id"]
+    events = await read_stream(client, debate_id)
+    agents = events[0][1]["debate"]["agents"]
+    advocates = [a for a in agents if a["role"] == "advocate"]
+    assert advocates and all(a["model"] == "qwen/qwen3.8-27b" for a in advocates)
+    judge = next(a for a in agents if a["role"] == "judge")
+    assert judge["model"] != "qwen/qwen3.8-27b"
 
 
 async def test_create_stream_and_read_debate(client_factory):

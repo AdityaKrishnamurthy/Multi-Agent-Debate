@@ -37,8 +37,12 @@ def load_personalities(path: Path | None = None) -> dict[str, PersonalitySpec]:
 class AgentFactory:
     """Constructs agents and personality-shaped system prompts."""
 
-    def __init__(self, profile: str | None = None) -> None:
+    def __init__(
+        self, profile: str | None = None, model_overrides: dict[str, str] | None = None
+    ) -> None:
         self.profile = profile
+        # role -> full LiteLLM model id, e.g. {"debater": "mistral/ministral-14b-latest"}
+        self.model_overrides = model_overrides or {}
         self.personalities = load_personalities()
         self._prompt_cache: dict[str, str] = {}
 
@@ -129,8 +133,14 @@ class AgentFactory:
             role=role,  # type: ignore[arg-type]
             personality=PersonalityConfig(trait=spec.trait, level=spec.level),
             stance=stance,  # type: ignore[arg-type]
-            model=get_raw_model_id(model_role or role, self.profile),
+            model=self._model_for(model_role or role),
         )
+
+    def _model_for(self, role: str) -> str:
+        override = self.model_overrides.get(role)
+        if override:
+            return override.split("/", 1)[1] if "/" in override else override
+        return get_raw_model_id(role, self.profile)
 
     def create_debate_agents(
         self,
@@ -184,11 +194,5 @@ class AgentFactory:
         return agents
 
     def get_model_map(self) -> dict[str, str]:
-        return {
-            "moderator": get_raw_model_id("moderator", self.profile),
-            "debater": get_raw_model_id("debater", self.profile),
-            "scholar": get_raw_model_id("scholar", self.profile),
-            "explorer": get_raw_model_id("explorer", self.profile),
-            "critic": get_raw_model_id("critic", self.profile),
-            "judge": get_raw_model_id("judge", self.profile),
-        }
+        roles = ("moderator", "debater", "scholar", "explorer", "critic", "judge")
+        return {role: self._model_for(role) for role in roles}

@@ -180,14 +180,24 @@ async def run_debate(
     enable_critic: bool = True,
     critic_threshold: float = CRITIC_THRESHOLD,
     debate_id: str | None = None,
+    model_overrides: dict[str, str] | None = None,
 ) -> Debate:
     """Run a personality-shaped debate with optional Critic scoring and revision loop.
 
     `debate_id` lets a caller (the API) choose the id up front; otherwise one is generated.
+    `model_overrides` maps a model role ("debater", "scholar", ...) to a full LiteLLM id.
     """
     usage_tracker.reset()
     debate_id = debate_id or str(uuid.uuid4())[:8]
-    factory = AgentFactory(profile=profile)
+    factory = AgentFactory(profile=profile, model_overrides=model_overrides)
+    if model_overrides:
+        base_complete = complete_fn
+
+        async def complete_fn(*args: Any, **kwargs: Any) -> Any:  # noqa: F811
+            override = model_overrides.get(kwargs.get("role", ""))
+            if override:
+                kwargs.setdefault("model", override)
+            return await base_complete(*args, **kwargs)
 
     agents = factory.create_debate_agents(num_advocates=num_agents, all_roles=all_roles)
     debaters = [a for a in agents if a.role in DEBATER_ROLES]

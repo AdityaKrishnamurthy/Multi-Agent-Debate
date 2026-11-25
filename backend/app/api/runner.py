@@ -72,6 +72,7 @@ class DebateRunner:
         num_rebuttals: int,
         all_roles: bool = False,
         enable_critic: bool = True,
+        model: str | None = None,
     ) -> str:
         if self.running_count() >= self.settings.max_concurrent_debates:
             raise TooManyDebates
@@ -82,12 +83,13 @@ class DebateRunner:
             "all_roles": all_roles,
             "critic": enable_critic,
             "profile": self.settings.llm_profile or "default",
+            "debater_model": model,
         }
         await self.store.create_debate(debate_id, question, config)
         live = LiveDebate(id=debate_id)
         self.live[debate_id] = live
         live.task = asyncio.create_task(
-            self._run(live, question, num_agents, num_rebuttals, all_roles, enable_critic)
+            self._run(live, question, num_agents, num_rebuttals, all_roles, enable_critic, model)
         )
         return debate_id
 
@@ -116,6 +118,7 @@ class DebateRunner:
         num_rebuttals: int,
         all_roles: bool,
         enable_critic: bool,
+        model: str | None = None,
     ) -> None:
         persist = asyncio.create_task(self._persist_worker(live))
         current_round = 0
@@ -141,6 +144,11 @@ class DebateRunner:
                 all_roles=all_roles,
                 enable_critic=enable_critic,
                 debate_id=live.id,
+                # The chosen model argues for every side; moderator, critic and judge
+                # keep their configured models so the referee stays constant.
+                model_overrides=(
+                    {"debater": model, "scholar": model, "explorer": model} if model else None
+                ),
             )
             await self.store.finish_debate(debate)
         except Exception as exc:

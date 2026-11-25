@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from app.api.live_state import build_live_debate
 from app.api.runner import DebateRunner, TooManyDebates
 from app.db.store import StoredEvent
-from app.llm import get_profile_config
+from app.llm import available_debate_models, default_debate_model, get_profile_config
 from app.settings import Settings
 
 router = APIRouter(prefix="/api")
@@ -32,6 +32,9 @@ class CreateDebateRequest(BaseModel):
     rebuttals: int = Field(default=2, ge=0)
     all_roles: bool = False
     critic: bool = True
+    model: str | None = Field(
+        default=None, description="Debater model id from /api/config/options (debate_models)."
+    )
 
 
 class CreateDebateResponse(BaseModel):
@@ -81,6 +84,10 @@ async def create_debate(body: CreateDebateRequest, request: Request) -> CreateDe
         raise HTTPException(422, f"At most {settings.max_agents} agents per debate.")
     if body.rebuttals > settings.max_rebuttals:
         raise HTTPException(422, f"At most {settings.max_rebuttals} rebuttal rounds per debate.")
+    if body.model is not None:
+        allowed = {m["id"] for m in available_debate_models()}
+        if body.model not in allowed:
+            raise HTTPException(422, "That model isn't available. Pick one from the list.")
     try:
         debate_id = await _runner(request).start(
             question=body.question.strip(),
@@ -88,6 +95,7 @@ async def create_debate(body: CreateDebateRequest, request: Request) -> CreateDe
             num_rebuttals=body.rebuttals,
             all_roles=body.all_roles,
             enable_critic=body.critic,
+            model=body.model,
         )
     except TooManyDebates as exc:
         raise HTTPException(
@@ -199,6 +207,8 @@ async def config_options(request: Request) -> dict[str, Any]:
     return {
         "profile": settings.llm_profile or "default",
         "models": profile.get("models", {}),
+        "debate_models": available_debate_models(),
+        "default_debate_model": default_debate_model(settings.llm_profile),
         "personalities": [
             {"role": role, "trait": cfg.get("trait"), "level": cfg.get("level")}
             for role, cfg in personalities.items()
