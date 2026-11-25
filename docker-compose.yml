@@ -1,0 +1,25 @@
+# Local infrastructure (plan 003 Part B).
+# Start the database:  docker compose up -d db
+# Stop it:             docker compose down        (add -v to also delete the data)
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: mad-db
+    environment:
+      POSTGRES_USER: mad
+      POSTGRES_PASSWORD: mad
+      POSTGRES_DB: mad
+    ports:
+      - "5432:5432"
+    volumes:
+      - mad-db-data:/var/lib/postgresql/data
+      # Enables the pgvector extension on first start.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mad -d mad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mad-db-data:
