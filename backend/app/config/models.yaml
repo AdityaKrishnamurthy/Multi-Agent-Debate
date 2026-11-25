@@ -35,17 +35,40 @@ profiles:
 
 # When every key for a provider is rate-limited, calls switch to these models
 # (only if that provider has a key in .env). Model IDs are full LiteLLM ids.
+# Tried in order; a model already tried in the same call, or a provider whose keys
+# are all cooling down, is skipped. Also used on timeouts, connection and server errors.
 fallbacks:
   groq:
+    - "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+    - "tokenharbor/deepseek-v4-flash:free"
+    - "mistral/ministral-14b-latest"
+  nvidia_nim:
+    - "groq/openai/gpt-oss-20b"
+    - "tokenharbor/deepseek-v4-flash:free"
+    - "mistral/ministral-14b-latest"
+  tokenharbor:
+    - "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+    - "groq/openai/gpt-oss-20b"
     - "mistral/ministral-14b-latest"
   mistral:
+    - "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     - "groq/openai/gpt-oss-20b"
+    - "tokenharbor/deepseek-v4-flash:free"
+
+# Extra OpenAI-compatible providers. The key comes from <NAME>_API_KEY in .env
+# (plus <NAME>_API_KEY_2, ... for more keys). groq/, mistral/ and nvidia_nim/ are
+# built into LiteLLM and need no entry here (NVIDIA_NIM_API_KEY, MISTRAL_API_KEY).
+providers:
+  tokenharbor:
+    litellm_prefix: openai
+    api_base: "https://tokenharbor.ai/v1"
 
 # Client-side pacing (requests per minute) for models with very low free-tier limits.
 # Mistral's free tier: 2 requests/minute per model; mistral-small/medium and
 # magistral are 0/minute on the free tier, so they are not used.
 rate_limits:
   "mistral/ministral-14b-latest": 2
+  nvidia_nim: 40 # NVIDIA NIM free tier: 40 requests/minute per account
 
 # Models offered in the UI for the debaters. Each one was tested with structured
 # debate calls (valid JSON 4/4). Entries whose provider has no key in .env are hidden.
@@ -62,6 +85,30 @@ debate_models:
     label: "Qwen 3.8 27B"
     provider: "Groq"
     note: "A different model family from the judge."
+  - id: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+    label: "Nemotron 3.5 Lightning 30B"
+    provider: "NVIDIA NIM"
+    note: "Quick; 40 requests a minute on the free tier."
+  - id: "nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
+    label: "Nemotron 3.5 Super 120B"
+    provider: "NVIDIA NIM"
+    note: "Larger Nemotron; a little slower."
+  - id: "nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b"
+    label: "Nemotron 3 Ultra 550B"
+    provider: "NVIDIA NIM"
+    note: "Largest model on the list; slowest of the NIM options."
+  - id: "nvidia_nim/minimaxai/minimax-m3.1-flash"
+    label: "MiniMax M3.1 Flash"
+    provider: "NVIDIA NIM"
+    note: "Reasons before answering, so each turn takes longer."
+  - id: "tokenharbor/deepseek-v4-flash:free"
+    label: "DeepSeek V4 Flash"
+    provider: "TokenHarbor"
+    note: "Free tier model."
+  - id: "tokenharbor/deepseek-v4.1-flash:free"
+    label: "DeepSeek V4.1 Flash"
+    provider: "TokenHarbor"
+    note: "Free tier model."
   - id: "mistral/ministral-14b-latest"
     label: "Ministral 14B"
     provider: "Mistral"
@@ -73,3 +120,4 @@ defaults:
   max_tokens: 2048
   max_retries: 1
   backoff_base: 2.0
+  request_timeout: 60 # seconds per LLM request before failing over

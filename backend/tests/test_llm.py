@@ -13,7 +13,8 @@ import pytest
 from app.llm import complete, key_pool, throttle, usage_tracker
 from app.schemas import AdvocateOutput
 
-KEY_VARS = [f"{p}_API_KEY{s}" for p in ("GROQ", "MISTRAL") for s in ("", "_2", "_3")]
+PROVIDERS = ("GROQ", "MISTRAL", "NVIDIA_NIM", "TOKENHARBOR")
+KEY_VARS = [f"{p}_API_KEY{s}" for p in PROVIDERS for s in ("", "_2", "_3")]
 
 
 @pytest.fixture(autouse=True)
@@ -220,3 +221,57 @@ async def test_low_limit_model_is_paced_not_failed(monkeypatch):
     # 2 requests/minute: the second call waits about 30 seconds instead of hitting a 429.
     assert mock_sleep.await_count == 1
     assert 25 < mock_sleep.await_args.args[0] <= 30
+
+
+@pytest.mark.asyncio
+async def test_timeout_fails_over_to_next_provider(monkeypatch):
+    monkeypatch.setenv("NVIDIA_NIM_API_KEY", "test-nim")
+    timeout = litellm.Timeout(message="slow", model="groq/openai/gpt-oss-20b", llm_provider="groq")
+    mock_acompletion = AsyncMock(side_effect=[timeout, _fake_response(VALID_ADVOCATE)])
+    with patch("app.llm.litellm.acompletion", mock_acompletion):
+        await complete(
+            role="debater", system="S", messages=[], schema=AdvocateOutput, profile="groq"
+        )
+    second = mock_acompletion.await_args_list[1].kwargs
+    assert second["model"] == "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert second["api_key"] == "test-nim"
+    assert second["timeout"] > 0
+
+
+@pytest.mark.asyncio
+async def test_tokenharbor_routes_through_openai_compatible_base(monkeypatch):
+    monkeypatch.setenv("TOKENHARBOR_API_KEY", "test-th")
+    mock_acompletion = AsyncMock(return_value=_fake_response(VALID_ADVOCATE))
+    with patch("app.llm.litellm.acompletion", mock_acompletion):
+        await complete(
+            role="debater",
+            system="S",
+            messages=[],
+            schema=AdvocateOutput,
+            model="tokenharbor/deepseek-v4-flash:free",
+        )
+    kw = mock_acompletion.await_args.kwargs
+    assert kw["model"] == "openai/deepseek-v4-flash:free"
+    assert kw["api_base"] == "https://tokenharbor.ai/v1"
+    assert kw["api_key"] == "test-th"
+
+
+@pytest.mark.asyncio
+async def test_fallback_never_returns_to_a_model_already_tried(monkeypatch):
+    monkeypatch.setenv("NVIDIA_NIM_API_KEY", "test-nim")
+    errors = [_rate_error("30"), _rate_error("30")]  # groq, then nim, both limited
+    mock_acompletion = AsyncMock(side_effect=[*errors, _fake_response(VALID_ADVOCATE)])
+    mock_sleep = AsyncMock()
+    with (
+        patch("app.llm.litellm.acompletion", mock_acompletion),
+        patch("app.llm.asyncio.sleep", mock_sleep),
+    ):
+        await complete(
+            role="debater", system="S", messages=[], schema=AdvocateOutput, profile="groq"
+        )
+    models = [c.kwargs["model"] for c in mock_acompletion.await_args_list]
+    assert models[0].startswith("groq/") and models[1].startswith("nvidia_nim/")
+    # No usable fallback left (groq already tried), so it waits out the cooldown and
+    # retries NIM rather than bouncing back to Groq.
+    assert models[2] == models[1]
+    assert any(c.args[0] >= 25 for c in mock_sleep.await_args_list)

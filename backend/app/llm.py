@@ -262,9 +262,30 @@ def default_debate_model(profile: str | None = None) -> str:
     return get_model_id("debater", profile)
 
 
-def rate_limit_for(config: dict[str, Any], model_id: str) -> float | None:
-    value = config.get("rate_limits", {}).get(model_id)
-    return float(value) if value else None
+def rate_limit_for(config: dict[str, Any], model_id: str) -> tuple[str, float] | None:
+    """(throttle key, requests/minute) for a model: per-model entry, else per-provider."""
+    limits = config.get("rate_limits", {})
+    if limits.get(model_id):
+        return model_id, float(limits[model_id])
+    provider = provider_of(model_id)
+    if limits.get(provider):
+        return provider, float(limits[provider])
+    return None
+
+
+def resolve_model(config: dict[str, Any], model_id: str) -> tuple[str, str | None]:
+    """Map our model id to (LiteLLM model, api_base).
+
+    Providers LiteLLM knows (groq/, mistral/, nvidia_nim/) pass through. Extra
+    OpenAI-compatible gateways are declared under `providers` in models.yaml, e.g.
+    "tokenharbor/deepseek-v4-flash" -> ("openai/deepseek-v4-flash", "https://tokenharbor.ai/v1").
+    """
+    provider = provider_of(model_id)
+    custom = config.get("providers", {}).get(provider)
+    if not custom:
+        return model_id, None
+    rest = model_id.split("/", 1)[1]
+    return f"{custom.get('litellm_prefix', 'openai')}/{rest}", custom.get("api_base")
 
 
 def provider_of(model_id: str) -> str:
@@ -272,10 +293,33 @@ def provider_of(model_id: str) -> str:
     return model_id.split("/", 1)[0] if "/" in model_id else ""
 
 
-def _fallback_models(config: dict[str, Any], current: str) -> list[str]:
-    """Configured fallbacks for the current provider whose provider has a key."""
+def _fallback_models(
+    config: dict[str, Any], current: str, tried: set[str] | None = None
+) -> list[str]:
+    """Usable fallbacks for the current model's provider, in configured order.
+
+    Skips models already tried in this call, providers with no key in .env, and
+    providers whose keys are all cooling down after a 429.
+    """
+    tried = tried or set()
     fallbacks = config.get("fallbacks", {}).get(provider_of(current), [])
-    return [m for m in fallbacks if m != current and KeyPool.keys(provider_of(m))]
+    return [
+        m
+        for m in fallbacks
+        if m != current and m not in tried and key_pool.available(provider_of(m))
+    ]
+
+
+# Errors that mean "this provider or model is unavailable right now": fail over
+# to a fallback model instead of retrying the same one.
+PROVIDER_FAILURES: tuple[type[Exception], ...] = (
+    litellm.Timeout,
+    litellm.APIConnectionError,
+    litellm.InternalServerError,
+    litellm.ServiceUnavailableError,
+    litellm.AuthenticationError,
+    litellm.NotFoundError,
+)
 
 
 def _response_format(
@@ -332,15 +376,20 @@ async def complete(
     def build_kwargs(mid: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
         fmt, system_content = _response_format(mid, schema, system)
         msgs = [{"role": "system", "content": system_content}, *user_messages]
+        litellm_model, custom_base = resolve_model(config, mid)
         kw: dict[str, Any] = {
-            "model": mid,
+            "model": litellm_model,
             "temperature": temp,
             "max_tokens": max_tok,
             "messages": msgs,
         }
         if fmt is not None:
             kw["response_format"] = fmt
-        if prof.get("base_url") and provider_of(mid) == prof.get("provider"):
+        # A hung model fails over instead of stalling the debate.
+        kw["timeout"] = float(defaults.get("request_timeout", 60))
+        if custom_base:
+            kw["api_base"] = custom_base
+        elif prof.get("base_url") and provider_of(mid) == prof.get("provider"):
             kw["api_base"] = prof["base_url"]
         return kw, msgs
 
@@ -349,17 +398,36 @@ async def complete(
     api_key = key_pool.pick(provider)
 
     rate_limit_waits = 3  # sleeps, once every key and fallback is exhausted
-    max_switches = 6  # key rotations + fallback switches per call
+    max_switches = 8  # key rotations + fallback switches per call
     parse_attempts = 0
     rate_waits = 0
     switches = 0
+    tried: set[str] = {model_id}
+
+    def switch_to_fallback(reason: str) -> bool:
+        nonlocal model_id, provider, api_key, kwargs, call_messages, switches
+        options = _fallback_models(config, model_id, tried)
+        if not options or switches >= max_switches:
+            return False
+        switches += 1
+        previous = model_id
+        model_id = options[0]
+        tried.add(model_id)
+        provider = provider_of(model_id)
+        api_key = key_pool.pick(provider)
+        kwargs, call_messages = build_kwargs(model_id)
+        usage_tracker.fallbacks += 1
+        logger.warning("%s on %s; falling back to %s", reason, previous, model_id)
+        return True
 
     while True:
         try:
             call_kwargs = dict(kwargs)
             if api_key:
                 call_kwargs["api_key"] = api_key
-            await throttle.wait(model_id, rate_limit_for(config, model_id))
+            limit = rate_limit_for(config, model_id)
+            if limit:
+                await throttle.wait(*limit)
             response = await litellm.acompletion(**call_kwargs)
             usage = getattr(response, "usage", None)
             if usage:
@@ -373,9 +441,9 @@ async def complete(
 
         except litellm.RateLimitError as exc:
             wait_sec = _get_retry_after(exc)
-            per_minute = rate_limit_for(config, model_id)
-            if per_minute:  # providers like Mistral send no retry-after header
-                wait_sec = max(wait_sec, 60.0 / per_minute)
+            limit = rate_limit_for(config, model_id)
+            if limit:  # providers like Mistral send no retry-after header
+                wait_sec = max(wait_sec, 60.0 / limit[1])
             key_pool.cool(api_key, wait_sec)
 
             next_key = key_pool.pick(provider, avoid=api_key)
@@ -385,16 +453,7 @@ async def complete(
                 api_key = next_key
                 continue
 
-            fallbacks = _fallback_models(config, model_id)
-            if fallbacks and switches < max_switches:
-                switches += 1
-                previous = model_id
-                model_id = fallbacks[0]
-                provider = provider_of(model_id)
-                api_key = key_pool.pick(provider)
-                kwargs, call_messages = build_kwargs(model_id)
-                usage_tracker.fallbacks += 1
-                logger.warning("Rate limited on %s; falling back to %s", previous, model_id)
+            if switch_to_fallback("Rate limited"):
                 continue
 
             if rate_waits >= rate_limit_waits:
@@ -410,6 +469,21 @@ async def complete(
             )
             await asyncio.sleep(wait_sec)
             api_key = key_pool.pick(provider) or api_key
+
+        except PROVIDER_FAILURES as exc:
+            if isinstance(exc, litellm.AuthenticationError):
+                key_pool.cool(api_key, 3600)  # a bad key stays out of rotation
+                next_key = key_pool.pick(provider, avoid=api_key)
+                if next_key and next_key != api_key and switches < max_switches:
+                    switches += 1
+                    api_key = next_key
+                    continue
+            if switch_to_fallback(type(exc).__name__):
+                continue
+            if parse_attempts >= max_retries:
+                raise
+            parse_attempts += 1
+            await asyncio.sleep(backoff_base ** (parse_attempts - 1))
 
         except (ValidationError, json.JSONDecodeError) as exc:
             if parse_attempts >= max_retries:
