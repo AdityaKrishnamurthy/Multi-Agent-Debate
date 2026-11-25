@@ -78,7 +78,7 @@ git rev-parse --git-dir >/dev/null && test -f README.md && test ! -d frontend &&
 - Model IDs live only in `backend/app/config/models.yaml`.
 - Experiments log their config, seed, model ID and token usage alongside the results.
 
-## Team split (suggested, 3–4 people; see PLANS.md open question 3)
+## Team split (suggested, 3–4 people; see PLANS.md open question 1)
 | Person | Area |
 |---|---|
 | A | Frontend (004, 011) |
