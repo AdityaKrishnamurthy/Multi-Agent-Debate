@@ -13,8 +13,6 @@ AI agents with different Big Five personalities argue a question over several ro
 
 </div>
 
-![A debate replay: Pro and Con arguments face each other, with the verdict and sources in the side panel](docs/images/debate.png)
-
 ## What it does
 
 | | |
@@ -25,8 +23,6 @@ AI agents with different Big Five personalities argue a question over several ro
 | **Watch it live** | Arguments stream into the browser round by round as the agents write them. |
 
 The project builds on **MAPS** ([arXiv:2503.16905](https://arxiv.org/abs/2503.16905)), which shapes agents with Big Five personality traits in a cooperative pipeline. Multi-Agent Debate adds adversarial debate, evidence citations, a Critic revision loop and a calibrated collective verdict.
-
-<p align="center"><img src="docs/images/home.png" alt="Home page with the question box and sample debates" width="80%"></p>
 
 ## Quick start
 
@@ -221,6 +217,6 @@ Set the provider keys from `.env.example`, plus:
 | `CORS_ORIGINS` | your Vercel URL, e.g. `https://multi-agent-debate.vercel.app` |
 | `CORS_ORIGIN_REGEX` | optional, to allow preview deployments: `https://.*\.vercel\.app` |
 
-## Acknowledgements
+## References
 
-Built on *MAPS: Multi-Agent Personality Shaping for Collaborative Reasoning* (arXiv:2503.16905). Debate design draws on Du et al. (2023), Liang et al. (2023), Irving et al. (2018) and Khan et al. (2024).
+1. Jian Zhang, Zhiyuan Wang, Zhangqi Wang, Fangzhi Xu, Qika Lin, Lingling Zhang, Rui Mao, Erik Cambria and Jun Liu. [*MAPS: Multi-Agent Personality Shaping for Collaborative Reasoning*](https://arxiv.org/abs/2503.16905). AAAI 2026. arXiv:2503.16905.
